@@ -5,6 +5,7 @@ import {
   useContext,
   useState,
   useCallback,
+  useMemo,
   useEffect,
 } from 'react';
 
@@ -100,18 +101,25 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [addToast],
   );
 
+  // Estabiliza o objeto de contexto para evitar que consumers
+  // que colocam 'toast' em deps de useEffect causem loops infinitos.
+  // As callbacks são stable; 'toasts' muda apenas quando toasts mudam,
+  // mas isso não é um problema porque consumers usam apenas as callbacks.
+  const stableValue = useMemo(
+    () => ({
+      toasts,
+      addToast,
+      removeToast,
+      success,
+      error,
+      info,
+      warning,
+    }),
+    [toasts, addToast, removeToast, success, error, info, warning],
+  );
+
   return (
-    <ToastContext.Provider
-      value={{
-        toasts,
-        addToast,
-        removeToast,
-        success,
-        error,
-        info,
-        warning,
-      }}
-    >
+    <ToastContext.Provider value={stableValue}>
       {children}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </ToastContext.Provider>

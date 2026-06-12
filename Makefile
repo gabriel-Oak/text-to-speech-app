@@ -1,4 +1,4 @@
-.PHONY: install dev build test lint lint-fix commit serve-tts
+.PHONY: install dev build test lint lint-fix commit serve-tts e2e e2e-headed
 
 install:
 	npm install
@@ -27,6 +27,12 @@ lint-fix:
 
 serve-tts:
 	pocket-tts serve --host 0.0.0.0 --port 8000
+
+e2e:
+	npm run e2e
+
+e2e-headed:
+	npm run e2e:headed
 
 commit:
 	@read -p "Commit message: " msg; \

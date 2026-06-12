@@ -2,24 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { text, voice, language } = body;
+    const incomingContentType = request.headers.get('content-type') || '';
+    let text: string | null = null;
+    let voice: string | null = null;
+
+    if (incomingContentType.includes('multipart/form-data')) {
+      const formData = await request.formData();
+      text = formData.get('text') as string | null;
+      voice = formData.get('voice') as string | null;
+    } else {
+      const json = await request.json();
+      text = json?.text as string | null;
+      voice = json?.voice as string | null;
+    }
 
     // Validação
-    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+    if (!text || text.trim().length === 0) {
       return NextResponse.json(
         { error: 'Texto é obrigatório e não pode ser vazio' },
-        { status: 400 },
-      );
-    }
-
-    if (!voice || typeof voice !== 'string') {
-      return NextResponse.json({ error: 'Voz é obrigatória' }, { status: 400 });
-    }
-
-    if (!language || typeof language !== 'string') {
-      return NextResponse.json(
-        { error: 'Idioma é obrigatório' },
         { status: 400 },
       );
     }
@@ -27,10 +27,28 @@ export async function POST(request: NextRequest) {
     const ttsServerUrl =
       process.env.NEXT_PUBLIC_TTS_SERVER_URL || 'http://localhost:8000';
 
-    const response = await fetch(`${ttsServerUrl}/generate`, {
+    // O Pocket TTS exige multipart/form-data com boundary no header.
+    // O fetch do Node.js não envia o boundary no Content-Type,
+    // então o FastAPI rejeita. Construímos manualmente.
+    const boundary = `nextjs-tts-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const outgoingContentType = `multipart/form-data; boundary=${boundary}`;
+
+    let body = `--${boundary}\r\n`;
+    body += 'Content-Disposition: form-field; name="text"\r\n\r\n';
+    body += `${text.trim()}\r\n`;
+
+    if (voice && voice.trim().length > 0) {
+      body += `--${boundary}\r\n`;
+      body += 'Content-Disposition: form-field; name="voice_url"\r\n\r\n';
+      body += `${voice.trim()}\r\n`;
+    }
+
+    body += `--${boundary}--\r\n\r\n`;
+
+    const response = await fetch(`${ttsServerUrl}/tts`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, voice, language }),
+      body,
+      headers: { 'Content-Type': outgoingContentType },
       signal: AbortSignal.timeout(60000),
     });
 
@@ -43,11 +61,11 @@ export async function POST(request: NextRequest) {
     }
 
     const audioBlob = await response.blob();
-    const contentType = audioBlob.type || 'audio/wav';
+    const audioContentType = audioBlob.type || 'audio/x-wav';
 
     return new NextResponse(audioBlob, {
       headers: {
-        'Content-Type': contentType,
+        'Content-Type': audioContentType,
         'Content-Disposition': 'attachment; filename="tts-output.wav"',
       },
     });

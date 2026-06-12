@@ -1,19 +1,20 @@
-import { TTSRequest, VoiceExportRequest, Voice } from '@/types/tts';
+import type { Voice } from '@/types/tts';
+import { TTSRequest, VoiceExportRequest } from '@/types/tts';
 
 const TTS_SERVER_URL =
   process.env.NEXT_PUBLIC_TTS_SERVER_URL || 'http://localhost:8000';
 
 // Gera áudio a partir de texto — retorna Blob
 export async function generateAudio(request: TTSRequest): Promise<Blob> {
-  const response = await fetch(`${TTS_SERVER_URL}/generate`, {
+  const formData = new FormData();
+  formData.append('text', request.text);
+  if (request.voice) formData.append('voice_url', request.voice);
+  if (request.language) formData.append('language', request.language);
+
+  const response = await fetch(`${TTS_SERVER_URL}/tts`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      text: request.text,
-      voice: request.voice,
-      language: request.language,
-    }),
-    signal: AbortSignal.timeout(60000), // timeout de 60s
+    body: formData,
+    signal: AbortSignal.timeout(60000),
   });
 
   if (!response.ok) {
@@ -36,7 +37,7 @@ export async function exportVoice(
   const response = await fetch(`${TTS_SERVER_URL}/export-voice`, {
     method: 'POST',
     body: formData,
-    signal: AbortSignal.timeout(120000), // timeout de 120s (clonagem pode demorar)
+    signal: AbortSignal.timeout(120000),
   });
 
   if (!response.ok) {
@@ -49,7 +50,7 @@ export async function exportVoice(
 // Lista vozes disponíveis
 export async function listVoices(): Promise<Voice[]> {
   const response = await fetch(`${TTS_SERVER_URL}/voices`, {
-    signal: AbortSignal.timeout(15000), // timeout de 15s
+    signal: AbortSignal.timeout(15000),
   });
 
   if (!response.ok) {

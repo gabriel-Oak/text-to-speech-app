@@ -90,18 +90,23 @@ function HomeContent() {
   }, [text, isGenerating]);
 
   // Feedback de sucesso ao gerar áudio
+  // toast é stable via useCallback no provider.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (status === GenerationStatus.Ready && audioUrl) {
       toast.success('Áudio gerado com sucesso!', 3000);
     }
-  }, [status, audioUrl, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, audioUrl]);
 
   // Feedback de erro ao gerar áudio
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (status === GenerationStatus.Error && error) {
       toast.error(`Erro ao gerar áudio: ${error}`, 6000);
     }
-  }, [status, error, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, error]);
 
   // -----------------------------------------------------------------------
   // Callbacks

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { execSync, execFileSync } from 'child_process';
+import { execSync } from 'child_process';
 import { randomUUID } from 'crypto';
 import { writeFileSync, unlinkSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
@@ -10,7 +10,6 @@ import { join } from 'path';
 
 /**
  * Parses a WAV file header to extract duration in seconds.
- * Returns null if not a valid WAV or duration cannot be determined.
  */
 function getWavDuration(buffer: Buffer): number | null {
   if (buffer.length < 4 || buffer.toString('ascii', 0, 4) !== 'RIFF')
@@ -46,15 +45,12 @@ function getWavDuration(buffer: Buffer): number | null {
 
 /**
  * Estimates MP3 duration from file size using a typical voice bitrate.
- * Returns null on unrecognisable content.
  */
 function estimateMp3Duration(buffer: Buffer): number | null {
   const firstBytes = buffer.slice(0, 4).toString('hex');
-
   let audioSize: number;
 
   if (firstBytes.startsWith('494433')) {
-    // ID3v2 header present
     const id3Size = buffer.readUInt32BE(6) >> 7;
     audioSize = buffer.length - (10 + id3Size);
   } else if (
@@ -63,13 +59,11 @@ function estimateMp3Duration(buffer: Buffer): number | null {
     firstBytes.startsWith('ff93') ||
     firstBytes.startsWith('ff23')
   ) {
-    // Raw MP3 sync frame
     audioSize = buffer.length;
   } else {
     return null;
   }
 
-  // Typical voice bitrate for Pocket TTS
   const bitrateBps = 128_000;
   return Math.round(((audioSize * 8) / bitrateBps) * 100) / 100;
 }
@@ -80,28 +74,14 @@ function getAudioDuration(buffer: Buffer, ext: string): number | null {
   return null;
 }
 
-/**
- * Checks whether the pocket-tts binary is available on PATH.
- */
-function isPocketTtsAvailable(): boolean {
-  try {
-    execFileSync('pocket-tts', ['--help'], { timeout: 5000, stdio: 'pipe' });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const MAX_DURATION_SECONDS = 30;
 const EXPORT_TIMEOUT_MS = 120_000;
-const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30 MB safety limit
+const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30 MB
 const TTS_VOICES_DIR = join(process.cwd(), '.tts-voices');
-const TTS_SERVER_URL =
-  process.env.NEXT_PUBLIC_TTS_SERVER_URL || 'http://localhost:8000';
 
 // ---------------------------------------------------------------------------
 // Route handler
@@ -172,7 +152,7 @@ export async function POST(request: NextRequest) {
       if (duration > MAX_DURATION_SECONDS) {
         return NextResponse.json(
           {
-            error: `Áudio muito longo (${duration.toFixed(2)}s). O Pocket TTS suporta no máximo ${MAX_DURATION_SECONDS} segundos.`,
+            error: `Áudio muito longo (${duration.toFixed(2)}s). Máximo: ${MAX_DURATION_SECONDS} segundos.`,
           },
           { status: 400 },
         );
@@ -201,94 +181,21 @@ export async function POST(request: NextRequest) {
 
     writeFileSync(tempPath, audioBuffer);
 
-    // --- Decide export strategy ---
+    // --- Run Pocket TTS export-voice CLI ---
 
-    const useCLI = isPocketTtsAvailable();
-    const pocketTtsBin = process.env.POCKET_TTS_BIN || 'pocket-tts';
+    const pocketTtsBin = process.env.POCKET_TTS_BIN || 'python3 -m pocket_tts';
+    const cmd = `${pocketTtsBin} export-voice --language ${language} "${tempPath}" "${safetensorsAbsolutePath}"`;
 
-    if (useCLI) {
-      // ---- Primary: pocket-tts CLI ----
+    execSync(cmd, {
+      timeout: EXPORT_TIMEOUT_MS,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
 
-      const cmd = `${pocketTtsBin} export-voice --language ${language} "${tempPath}" "${safetensorsAbsolutePath}"`;
-
-      execSync(cmd, {
-        timeout: EXPORT_TIMEOUT_MS,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-
-      if (!existsSync(safetensorsAbsolutePath)) {
-        throw new Error(
-          'O arquivo .safetensors não foi gerado pelo Pocket TTS.',
-        );
-      }
-    } else {
-      // ---- Fallback: HTTP endpoint of Pocket TTS server ----
-
-      const fallbackUrl = `${TTS_SERVER_URL}/export-voice`;
-
-      const fallbackFormData = new FormData();
-      fallbackFormData.append('file', file, file.name);
-      fallbackFormData.append('name', name.trim());
-      fallbackFormData.append('language', language);
-
-      let response: Response;
-      try {
-        response = await fetch(fallbackUrl, {
-          method: 'POST',
-          body: fallbackFormData,
-          signal: AbortSignal.timeout(EXPORT_TIMEOUT_MS),
-        });
-      } catch (fetchError) {
-        const err = fetchError as Error;
-        if (err.name === 'TimeoutError' || err.name === 'AbortError') {
-          return NextResponse.json(
-            {
-              error: `Tempo limite excedido ao conectar com o servidor TTS (${EXPORT_TIMEOUT_MS / 1000}s).`,
-            },
-            { status: 504 },
-          );
-        }
-        return NextResponse.json(
-          {
-            error: `Falha ao conectar com o servidor TTS para exportação: ${err.message}`,
-          },
-          { status: 502 },
-        );
-      }
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        return NextResponse.json(
-          {
-            error: `Falha na exportação via servidor TTS (${response.status}): ${errorBody}`,
-          },
-          { status: response.status },
-        );
-      }
-
-      const result = await response.json();
-
-      if (result && result.safetensorsPath) {
-        // Server may return a relative or absolute path
-        const returnedPath = result.safetensorsPath.startsWith('/')
-          ? result.safetensorsPath
-          : join(process.cwd(), result.safetensorsPath);
-
-        if (!existsSync(returnedPath)) {
-          throw new Error(
-            'O arquivo .safetensors retornado pelo servidor não foi encontrado.',
-          );
-        }
-
-        return NextResponse.json({
-          voiceId,
-          name: safeName,
-          safetensorsPath: result.safetensorsPath,
-        });
-      }
+    if (!existsSync(safetensorsAbsolutePath)) {
+      throw new Error('O arquivo .safetensors não foi gerado pelo Pocket TTS.');
     }
 
-    // --- Success ----
+    // --- Success ---
 
     return NextResponse.json({
       voiceId,
@@ -301,7 +208,7 @@ export async function POST(request: NextRequest) {
       try {
         unlinkSync(tempPath);
       } catch {
-        // Best effort — don't throw here
+        // Best effort
       }
     }
 
