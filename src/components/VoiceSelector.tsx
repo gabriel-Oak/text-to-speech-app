@@ -85,6 +85,7 @@ export default function VoiceSelector({
       const data = await response.json();
       if (mountedRef.current) {
         setVoices(data.voices || []);
+        setLoading(false);
       }
     } catch (err) {
       if (mountedRef.current) {
@@ -446,6 +447,7 @@ function VoiceOption({
       className={`vs-option ${isCloned ? 'vs-option-cloned' : ''}`}
       role="option"
       aria-selected={selected}
+      data-testid={isCloned ? `voice-option-cloned-${voice.name}` : undefined}
       style={{
         ...styles.option,
         ...(isCloned ? styles.optionCloned : {}),

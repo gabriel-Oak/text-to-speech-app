@@ -37,14 +37,62 @@ export async function POST(request: NextRequest) {
     body += 'Content-Disposition: form-field; name="text"\r\n\r\n';
     body += `${text.trim()}\r\n`;
 
+    // Resolve voice: can be a builtin name (e.g., 'rafael'), a cloned voice
+    // name, a UUID from the VoiceSelector, or a .safetensors path.
+    let voiceParam: string | null = null;
     if (voice && voice.trim().length > 0) {
+      const fs = await import('fs');
+      const path = await import('path');
+      const ttsVoicesDir = path.join(process.cwd(), '.tts-voices');
+
+      if (fs.existsSync(ttsVoicesDir)) {
+        // 1. Direct match: <voice>.safetensors exists (cloned voice name)
+        const directPath = path.join(ttsVoicesDir, `${voice.trim()}.safetensors`);
+        if (fs.existsSync(directPath)) {
+          voiceParam = directPath;
+        } else {
+          // 2. Voice is a UUID — match against cloned voices via /api/voices/list
+          const safetensorsFiles = fs.readdirSync(ttsVoicesDir).filter((f) => f.endsWith('.safetensors'));
+          if (safetensorsFiles.length > 0) {
+            try {
+              const base = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+              const voicesRes = await fetch(`${base}/api/voices/list`);
+              const voicesData = await voicesRes.json();
+              const allVoices = voicesData?.voices || [];
+              const targetVoice = allVoices.find((v: any) => v.id === voice.trim());
+              if (targetVoice && targetVoice.type === 'cloned') {
+                const safetensorsName = `${targetVoice.name}.safetensors`;
+                if (safetensorsFiles.includes(safetensorsName)) {
+                  voiceParam = path.join(ttsVoicesDir, safetensorsName);
+                }
+              }
+            } catch {
+              // ignore — fall through to treating as builtin
+            }
+          }
+        }
+      }
+
+      // 3. If no .safetensors match, treat as a builtin voice name.
+      //    Pocket TTS accepts builtin names only when voice_url is omitted
+      //    (it uses get_default_voice_for_language()) or when the name is
+      //    in _ORIGINS_OF_PREDEFINED_VOICES. We pass it as voice_url since
+      //    Pocket TTS 2.1+ accepts builtin names as simple strings.
+      if (!voiceParam) {
+        voiceParam = voice.trim();
+      }
+    }
+
+    if (voiceParam) {
       body += `--${boundary}\r\n`;
       body += 'Content-Disposition: form-field; name="voice_url"\r\n\r\n';
-      body += `${voice.trim()}\r\n`;
+      body += `${voiceParam}\r\n`;
+      console.error(`[TTS] Final voice_url: ${voiceParam}`);
     }
 
     body += `--${boundary}--\r\n\r\n`;
 
+    console.error(`[TTS] Sending to ${ttsServerUrl}/tts`);
     const response = await fetch(`${ttsServerUrl}/tts`, {
       method: 'POST',
       body,
@@ -52,18 +100,22 @@ export async function POST(request: NextRequest) {
       signal: AbortSignal.timeout(60000),
     });
 
+    console.error(`[TTS] Response status: ${response.status}, headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`);
+
     if (!response.ok) {
       const errorBody = await response.text();
+      console.error(`[TTS] Error body: ${errorBody}`);
       return NextResponse.json(
         { error: `Erro no servidor TTS: ${errorBody}` },
         { status: response.status },
       );
     }
 
-    const audioBlob = await response.blob();
-    const audioContentType = audioBlob.type || 'audio/x-wav';
+    const audioContentType =
+      response.headers.get('content-type') || 'audio/x-wav';
 
-    return new NextResponse(audioBlob, {
+    return new NextResponse(response.body, {
+      status: response.status,
       headers: {
         'Content-Type': audioContentType,
         'Content-Disposition': 'attachment; filename="tts-output.wav"',
