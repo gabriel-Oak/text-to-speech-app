@@ -29,10 +29,10 @@ npx playwright test
 
 ## Testes
 
-| Arquivo | Descrição |
-|---|---|
-| `tts-generation.spec.ts` | Fluxo completo: carregar home, preencher texto, gerar áudio |
-| `voice-cloning.spec.ts` | Clonagem de voz: upload de arquivo, chamada à API, verificação no seletor |
+| Arquivo                  | Descrição                                                                 |
+| ------------------------ | ------------------------------------------------------------------------- |
+| `tts-generation.spec.ts` | Fluxo completo: carregar home, preencher texto, gerar áudio               |
+| `voice-cloning.spec.ts`  | Clonagem de voz: upload de arquivo, chamada à API, verificação no seletor |
 
 ## Notas
 

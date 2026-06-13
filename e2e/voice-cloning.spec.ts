@@ -3,22 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const BASE_URL = 'http://localhost:3000';
-const TTS_API_URL = 'http://localhost:8000';
 const VOICE_SAMPLE_PATH = join(__dirname, '..', '.samples', 'voice-sample.mp3');
-
-/**
- * Verifica se o Pocket TTS está rodando na porta esperada.
- */
-async function isTtsServerRunning(): Promise<boolean> {
-  try {
-    const res = await fetch(`${TTS_API_URL}/health`, {
-      signal: AbortSignal.timeout(5_000),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
 
 test.describe('Pocket TTS — Clonagem de Voz', () => {
   test.beforeEach(async ({ page }) => {
@@ -28,8 +13,6 @@ test.describe('Pocket TTS — Clonagem de Voz', () => {
   test('deve clonar uma voz, verificar sucesso e exibi-la no seletor de vozes', async ({
     page,
   }) => {
-    const ttsAvailable = await isTtsServerRunning();
-
     // -----------------------------------------------------------------------
     // 1. Chama a API de clonagem de voz diretamente (full stack)
     // -----------------------------------------------------------------------
@@ -84,9 +67,9 @@ test.describe('Pocket TTS — Clonagem de Voz', () => {
     );
 
     // Aguarda que o VoiceSelector termine o loading (skeleton desaparece)
-    await expect(
-      page.locator('.skeleton-item'),
-    ).not.toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.skeleton-item')).not.toBeVisible({
+      timeout: 15_000,
+    });
 
     // Aguarda que o trigger do seletor fique habilitado
     await expect(voiceSelectorTrigger).toBeEnabled({ timeout: 15_000 });
@@ -95,9 +78,9 @@ test.describe('Pocket TTS — Clonagem de Voz', () => {
     await voiceSelectorTrigger.click();
 
     // Aguarda o grupo "Clonadas" aparecer
-    await expect(
-      page.locator('text="Clonadas"'),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('text="Clonadas"')).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Verifica que a voz clonada aparece na lista do dropdown
     // (a API retorna language='english' para vozes clonadas → label '(en)')

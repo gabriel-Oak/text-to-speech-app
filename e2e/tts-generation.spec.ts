@@ -24,24 +24,24 @@ test.describe('Pocket TTS — Fluxo completo de geração de áudio', () => {
 
   test('deve carregar a página inicial com o cabeçalho', async ({ page }) => {
     await expect(page.locator('h1')).toContainText('Pocket TTS');
-    await expect(
-      page.locator('text="Texto para falar"'),
-    ).toBeVisible();
+    await expect(page.locator('text="Texto para falar"')).toBeVisible();
   });
 
   test('deve exibir seções do formulário', async ({ page }) => {
-    await expect(
-      page.locator('textarea, [role="textbox"]'),
-    ).toBeVisible();
+    await expect(page.locator('textarea, [role="textbox"]')).toBeVisible();
     await expect(page.locator('text=/Idioma/')).toBeVisible();
     await expect(page.locator('label', { hasText: 'Voz:' })).toBeVisible();
     await expect(page.locator('button', { hasText: /Gerar/ })).toBeVisible();
   });
 
-  test('deve preencher campos e verificar que API retorna áudio', async ({ page }) => {
+  test('deve preencher campos e verificar que API retorna áudio', async ({
+    page,
+  }) => {
     const textarea = page.locator('textarea, [role="textbox"]');
     await textarea.fill('Olá, este é um teste de texto para fala.');
-    await expect(textarea).toHaveValue('Olá, este é um teste de texto para fala.');
+    await expect(textarea).toHaveValue(
+      'Olá, este é um teste de texto para fala.',
+    );
 
     const ttsRunning = await isTtsServerRunning();
 
@@ -53,16 +53,24 @@ test.describe('Pocket TTS — Fluxo completo de geração de áudio', () => {
         const res = await fetch('/api/tts/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, voice: 'rafael', language: 'portuguese' }),
+          body: JSON.stringify({
+            text,
+            voice: 'rafael',
+            language: 'portuguese',
+          }),
           signal: AbortSignal.timeout(60_000),
         });
         let bodyBytes: number[] = [];
-        let contentType = res.headers.get('content-type') || '';
+        const contentType = res.headers.get('content-type') || '';
         if (res.ok) {
           const buffer = await res.arrayBuffer();
           bodyBytes = Array.from(new Uint8Array(buffer));
         }
-        return { status: res.status, contentType, bodyLength: bodyBytes.length };
+        return {
+          status: res.status,
+          contentType,
+          bodyLength: bodyBytes.length,
+        };
       }, 'Olá, este é um teste de texto para fala.');
 
       expect(audioResult.status).toBe(200);
@@ -78,12 +86,14 @@ test.describe('Pocket TTS — Fluxo completo de geração de áudio', () => {
   test('deve mostrar dica de atalho Ctrl+Enter', async ({ page }) => {
     const textarea = page.locator('textarea, [role="textbox"]');
     await textarea.fill('Texto de teste');
-    await expect(
-      page.locator('text=/Ctrl\\+Enter/'),
-    ).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('text=/Ctrl\\+Enter/')).toBeVisible({
+      timeout: 5_000,
+    });
   });
 
   test('deve ter seções de clonagem de voz', async ({ page }) => {
-    await expect(page.locator('text=/Clonar Voz|Upload|Voz Clonada/')).toBeVisible();
+    await expect(
+      page.locator('text=/Clonar Voz|Upload|Voz Clonada/'),
+    ).toBeVisible();
   });
 });

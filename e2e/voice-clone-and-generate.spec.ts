@@ -3,22 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const BASE_URL = 'http://localhost:3000';
-const TTS_API_URL = 'http://localhost:8000';
 const VOICE_SAMPLE_PATH = join(__dirname, '..', '.samples', 'voice-sample.mp3');
-
-/**
- * Verifica se o Pocket TTS está rodando na porta esperada.
- */
-async function isTtsServerRunning(): Promise<boolean> {
-  try {
-    const res = await fetch(`${TTS_API_URL}/health`, {
-      signal: AbortSignal.timeout(5_000),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
 
 test.describe('Pocket TTS — Clone de Voz e Geração de Áudio (E2E)', () => {
   test.beforeEach(async ({ page }) => {
@@ -28,8 +13,6 @@ test.describe('Pocket TTS — Clone de Voz e Geração de Áudio (E2E)', () => {
   test('deve clonar uma voz, gerar áudio com a voz clonada e verificar no UI', async ({
     page,
   }) => {
-    const ttsAvailable = await isTtsServerRunning();
-
     // -----------------------------------------------------------------------
     // 1. Clona uma voz via API de exportação
     // -----------------------------------------------------------------------
@@ -128,7 +111,10 @@ test.describe('Pocket TTS — Clone de Voz e Geração de Áudio (E2E)', () => {
           bodyText,
         };
       },
-      { voiceName: voiceInfo.name, text: 'Olá, este é um teste de texto para fala usando a voz clonada.' },
+      {
+        voiceName: voiceInfo.name,
+        text: 'Olá, este é um teste de texto para fala usando a voz clonada.',
+      },
     );
 
     if (audioResponse.status !== 200) {
@@ -151,9 +137,9 @@ test.describe('Pocket TTS — Clone de Voz e Geração de Áudio (E2E)', () => {
     );
 
     // Aguarda que os skeletons de loading desapareçam
-    await expect(
-      page.locator('.skeleton-item'),
-    ).not.toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.skeleton-item')).not.toBeVisible({
+      timeout: 15_000,
+    });
 
     // Aguarda que o trigger do seletor fique habilitado
     await expect(voiceSelectorTrigger).toBeEnabled({ timeout: 15_000 });
@@ -162,9 +148,9 @@ test.describe('Pocket TTS — Clone de Voz e Geração de Áudio (E2E)', () => {
     await voiceSelectorTrigger.click();
 
     // Aguarda o grupo "Clonadas" aparecer
-    await expect(
-      page.locator('text="Clonadas"'),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('text="Clonadas"')).toBeVisible({
+      timeout: 15_000,
+    });
 
     // A voz clonada deve aparecer no dropdown (a API retorna language='english'
     // para vozes clonadas → label '(en)')
@@ -192,7 +178,8 @@ test.describe('Pocket TTS — Clone de Voz e Geração de Áudio (E2E)', () => {
       return data.voices || [];
     });
     const clonedVoiceEntry = currentVoices.find(
-      (v: any) => v.name === voiceName && v.type === 'cloned',
+      (v: { name: string; type: string }) =>
+        v.name === voiceName && v.type === 'cloned',
     );
     expect(clonedVoiceEntry).toBeDefined();
 
@@ -223,7 +210,11 @@ test.describe('Pocket TTS — Clone de Voz e Geração de Áudio (E2E)', () => {
         }
         return { status: res.status, contentType, bodyLength, bodyText };
       },
-      { voiceName: voiceName, text: 'Olá, esta é uma geração de áudio via UI usando a voz clonada.', lang: 'portuguese' },
+      {
+        voiceName: voiceName,
+        text: 'Olá, esta é uma geração de áudio via UI usando a voz clonada.',
+        lang: 'portuguese',
+      },
     );
 
     expect(audioResult.status).toBe(200);
