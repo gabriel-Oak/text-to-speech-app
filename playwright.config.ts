@@ -13,7 +13,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: 'e2e',
-  logLevel: 'silent',
+  // logLevel removed — causes type error in newer Playwright versions
   timeout: 120_000,
   expect: {
     timeout: 30_000,
@@ -39,5 +39,6 @@ export default defineConfig({
       'NEXT_PUBLIC_TTS_SERVER_URL=http://localhost:8000 npm run dev 2>/dev/null',
     port: 3000,
     timeout: 90_000,
+    reuseExistingServer: true,
   },
 });
