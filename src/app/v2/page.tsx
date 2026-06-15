@@ -11,16 +11,6 @@ import { useVoiceCloneV2 } from '@/hooks/useVoiceCloneV2';
 import { useStreamAudio } from '@/hooks/useStreamAudio';
 
 // ---------------------------------------------------------------------------
-// Metadata da página
-// ---------------------------------------------------------------------------
-
-export const metadata = {
-  title: 'Voice Clone v2 — Gerador de Áudio',
-  description:
-    'Gere áudio com vozes customizadas. Selecione uma voz ou faça upload de um áudio para clonagem e digite o texto a ser sintetizado.',
-};
-
-// ---------------------------------------------------------------------------
 // Componente Principal
 // ---------------------------------------------------------------------------
 
