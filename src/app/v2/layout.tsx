@@ -19,7 +19,9 @@ export default function V2Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className="dark">
       <body className={inter.className}>
-        <div style={styles.wrapper}>{children}</div>
+        <div style={styles.wrapper}>
+          <div style={styles.inner}>{children}</div>
+        </div>
       </body>
     </html>
   );

@@ -65,7 +65,7 @@ function V2Content() {
         : 'idle';
 
   return (
-    <>
+    <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
         <h1 style={styles.headerTitle}>🎙️ Voice Clone v2</h1>
@@ -120,7 +120,7 @@ function V2Content() {
           />
         </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -141,6 +141,9 @@ export default function V2Page() {
 // ---------------------------------------------------------------------------
 
 const styles: Record<string, CSSProperties> = {
+  container: {
+    width: '100%',
+  },
   header: {
     textAlign: 'center',
     padding: '28px 0 24px',
