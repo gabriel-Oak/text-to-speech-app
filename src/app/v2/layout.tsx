@@ -5,9 +5,9 @@ import '../../app/globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Voice Clone v2 — Gerador de Áudio',
+  title: 'Voice Clone v2 — Voice Cloning',
   description:
-    'Gere áudio com vozes customizadas. Selecione uma voz ou faça upload de um áudio para clonagem e digite o texto a ser sintetizado.',
+    'Gere áudio com vozes customizadas usando clonagem de voz via IA.',
 };
 
 export const viewport: Viewport = {
