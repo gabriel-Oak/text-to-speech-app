@@ -47,19 +47,27 @@ export async function POST(request: NextRequest) {
 
       if (fs.existsSync(ttsVoicesDir)) {
         // 1. Direct match: <voice>.safetensors exists (cloned voice name)
-        const directPath = path.join(ttsVoicesDir, `${voice.trim()}.safetensors`);
+        const directPath = path.join(
+          ttsVoicesDir,
+          `${voice.trim()}.safetensors`,
+        );
         if (fs.existsSync(directPath)) {
           voiceParam = directPath;
         } else {
           // 2. Voice is a UUID — match against cloned voices via /api/voices/list
-          const safetensorsFiles = fs.readdirSync(ttsVoicesDir).filter((f) => f.endsWith('.safetensors'));
+          const safetensorsFiles = fs
+            .readdirSync(ttsVoicesDir)
+            .filter((f) => f.endsWith('.safetensors'));
           if (safetensorsFiles.length > 0) {
             try {
-              const base = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+              const base =
+                process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
               const voicesRes = await fetch(`${base}/api/voices/list`);
               const voicesData = await voicesRes.json();
               const allVoices = voicesData?.voices || [];
-              const targetVoice = allVoices.find((v: any) => v.id === voice.trim());
+              const targetVoice = allVoices.find(
+                (v: any) => v.id === voice.trim(),
+              );
               if (targetVoice && targetVoice.type === 'cloned') {
                 const safetensorsName = `${targetVoice.name}.safetensors`;
                 if (safetensorsFiles.includes(safetensorsName)) {
@@ -100,7 +108,9 @@ export async function POST(request: NextRequest) {
       signal: AbortSignal.timeout(60000),
     });
 
-    console.error(`[TTS] Response status: ${response.status}, headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`);
+    console.error(
+      `[TTS] Response status: ${response.status}, headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`,
+    );
 
     if (!response.ok) {
       const errorBody = await response.text();
