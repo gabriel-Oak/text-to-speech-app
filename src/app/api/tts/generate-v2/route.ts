@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const TTS_SERVER_URL =
   process.env.NEXT_PUBLIC_TTS_SERVER_URL || 'http://localhost:8000';
-const BUFFER_DURATION = 3000; // ms
 const REQUEST_TIMEOUT = 60000; // ms
 
 /**
@@ -85,9 +84,12 @@ export async function POST(request: NextRequest) {
     let response: Response;
 
     if (wavFromFile) {
-      // Com arquivo: body = string + binário
+      // Com arquivo: body = string multipart + bytes binários do arquivo
+      // Usar Buffer.concat para preservar dados binários (não usar string + Buffer
+      // pois a coerção converte para UTF-8 e corrompe dados binários)
       const wavBytes = Buffer.from(await wavFromFile.arrayBuffer());
-      const fullBody = body + (wavBytes as unknown as string);
+      const bodyBuffer = Buffer.from(body, 'utf-8');
+      const fullBody = Buffer.concat([bodyBuffer, wavBytes]);
 
       response = await fetch(ttsUrl, {
         method: 'POST',
@@ -116,20 +118,8 @@ export async function POST(request: NextRequest) {
     const audioContentType =
       response.headers.get('content-type') || 'audio/x-wav';
 
-    // --- Stream com buffer de 3s via TransformStream ---
-    const startTime = Date.now();
-    const transform = new TransformStream({
-      transform(chunk: Uint8Array, controller) {
-        const elapsed = Date.now() - startTime;
-        if (elapsed >= BUFFER_DURATION) {
-          controller.enqueue(chunk);
-        }
-      },
-    });
-
-    const readableStream = response.body!.pipeThrough(transform);
-
-    return new Response(readableStream, {
+    // --- Stream direto (sem buffer) ---
+    return new NextResponse(response.body, {
       status: 200,
       headers: {
         'Content-Type': audioContentType,
