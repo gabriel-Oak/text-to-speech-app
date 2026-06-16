@@ -49,7 +49,6 @@ next-env.d.ts
 .tts-voices/
 .samples
 test-results
-.pi
 .plans
 .specs
 test-results/
