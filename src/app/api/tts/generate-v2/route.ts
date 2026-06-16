@@ -5,44 +5,57 @@ const TTS_SERVER_URL =
 const REQUEST_TIMEOUT = 60000; // ms
 
 /**
- * Constrói o body multipart/form-data como string para o Pocket TTS.
- * Segue o mesmo padrão da rota /api/tts/generate que funciona.
+ * Constrói o corpo multipart/form-data como array de Buffers.
+ * Isso evita problemas de conversão string→UTF-8→corrupção de bytes.
  */
-function buildMultipartBody(
+function buildMultipartParts(
   text: string,
   voiceUrl: string,
   voiceWav?: File,
-): { body: string; boundary: string; wavFile?: File } {
+): { parts: Buffer[]; boundary: string } {
   const boundary = `v2-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  let body = `--${boundary}\r\n`;
-  body += 'Content-Disposition: form-data; name="text"\r\n\r\n';
-  body += `${text}\r\n`;
+  const parts: Buffer[] = [];
 
-  if (voiceUrl) {
-    body += `--${boundary}\r\n`;
-    body += 'Content-Disposition: form-data; name="voice_url"\r\n\r\n';
-    body += `${voiceUrl}\r\n`;
-  }
+  // Part: text (sempre presente)
+  parts.push(
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="text"\r\n\r\n${text}\r\n`,
+    ),
+  );
 
+  // Se há voice_wav, NÃO enviamos voice_url (o Pocket TTS precisa de apenas um)
   if (voiceWav) {
-    body += `--${boundary}\r\n`;
-    body += `Content-Disposition: form-data; name="voice_wav"; filename="${voiceWav.name}"\r\n`;
-    body += `Content-Type: ${voiceWav.type || 'audio/wav'}\r\n\r\n`;
-    // Arquivo binário será anexado separadamente
-    return { body, boundary, wavFile: voiceWav };
+    // Part: voice_wav (header + conteúdo binário será adicionado no handler)
+    parts.push(
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="voice_wav"; filename="${voiceWav.name}"\r\nContent-Type: ${voiceWav.type || 'audio/wav'}\r\n\r\n`,
+      ),
+    );
+    return { parts, boundary };
   }
 
-  body += `--${boundary}--\r\n`;
-  return { body, boundary };
+  // Part: voice_url (somente quando NÃO há voice_wav)
+  if (voiceUrl) {
+    parts.push(
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="voice_url"\r\n\r\n${voiceUrl}\r\n`,
+      ),
+    );
+  }
+
+  // Footer
+  parts.push(Buffer.from(`--${boundary}--\r\n`));
+
+  return { parts, boundary };
 }
 
 /**
  * POST /api/tts/generate-v2
  *
  * Route handler com streaming para o Pocket TTS.
- * Recebe FormData com text, voice_url (ou voice_wav),
- * aplica buffer de 3s via TransformStream e retorna audio stream.
+ * Recebe FormData com text, voice_url (ou voice_wav)
+ * e retorna audio stream.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -69,43 +82,35 @@ export async function POST(request: NextRequest) {
 
     const wavFile = voiceWav instanceof File ? (voiceWav as File) : undefined;
 
-    // --- Construir body multipart como string (mesmo padrão da rota /generate) ---
-    const {
-      body,
-      boundary,
-      wavFile: wavFromFile,
-    } = buildMultipartBody(text.trim(), voiceUrl || '', wavFile);
+    // --- Construir body multipart como array de Buffers ---
+    const { parts, boundary } = buildMultipartParts(
+      text.trim(),
+      voiceUrl || '',
+      wavFile,
+    );
 
     const outgoingContentType = `multipart/form-data; boundary=${boundary}`;
 
     // --- Forward para Pocket TTS ---
     const ttsUrl = `${TTS_SERVER_URL}/tts`;
 
-    let response: Response;
+    let fullBody: Buffer;
 
-    if (wavFromFile) {
-      // Com arquivo: body = string multipart + bytes binários do arquivo
-      // Usar Buffer.concat para preservar dados binários (não usar string + Buffer
-      // pois a coerção converte para UTF-8 e corrompe dados binários)
-      const wavBytes = Buffer.from(await wavFromFile.arrayBuffer());
-      const bodyBuffer = Buffer.from(body, 'utf-8');
-      const fullBody = Buffer.concat([bodyBuffer, wavBytes]);
-
-      response = await fetch(ttsUrl, {
-        method: 'POST',
-        body: fullBody,
-        headers: { 'Content-Type': outgoingContentType },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT),
-      });
+    if (wavFile) {
+      // Com arquivo: parts + bytes binários do arquivo
+      const wavBytes = Buffer.from(await wavFile.arrayBuffer());
+      fullBody = Buffer.concat([...parts, wavBytes]);
     } else {
-      // Sem arquivo: body 100% string
-      response = await fetch(ttsUrl, {
-        method: 'POST',
-        body,
-        headers: { 'Content-Type': outgoingContentType },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT),
-      });
+      // Sem arquivo: parts já inclui o footer
+      fullBody = Buffer.concat(parts);
     }
+
+    const response = await fetch(ttsUrl, {
+      method: 'POST',
+      body: fullBody,
+      headers: { 'Content-Type': outgoingContentType },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+    });
 
     if (!response.ok) {
       const errorBody = await response.text();
