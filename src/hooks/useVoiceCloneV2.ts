@@ -167,10 +167,10 @@ export function useVoiceCloneV2(): {
     if (uploadedAudio) {
       const fileName = uploadedAudio.name.toLowerCase();
       const ext = fileName.split('.').pop() || '';
-      const allowedExtensions = ['wav', 'mp3'];
+      const allowedExtensions = ['wav', 'mp3', 'ogg'];
 
       if (!allowedExtensions.includes(ext)) {
-        const msg = `Formato não suportado. Aceita apenas .wav ou .mp3 (recebido: .${ext})`;
+        const msg = `Formato não suportado. Aceita apenas .wav, .mp3 ou .ogg (recebido: .${ext})`;
         setError(msg);
         setGenerationStatus('error');
         throw new Error(msg);
@@ -188,11 +188,11 @@ export function useVoiceCloneV2(): {
       formData.append('text', text.trim());
 
       if (selectedVoice) {
-        formData.append('voice', selectedVoice);
+        formData.append('voice_url', selectedVoice);
       }
 
       if (uploadedAudio) {
-        formData.append('audio', uploadedAudio);
+        formData.append('voice_wav', uploadedAudio);
       }
 
       const response = await fetch('/api/tts/generate-v2', {

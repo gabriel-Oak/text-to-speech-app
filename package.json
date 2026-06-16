@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
-    "serve:tts": "pocket-tts serve --host 0.0.0.0 --port 8000",
+    "serve:tts": "pocket-tts serve --host 0.0.0.0 --port 8000 --language portuguese",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
