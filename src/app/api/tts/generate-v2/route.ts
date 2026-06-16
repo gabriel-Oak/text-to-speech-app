@@ -1,54 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import FormData from 'form-data';
 
 const TTS_SERVER_URL =
   process.env.NEXT_PUBLIC_TTS_SERVER_URL || 'http://localhost:8000';
 const REQUEST_TIMEOUT = 60000; // ms
-
-/**
- * Constrói o corpo multipart/form-data como array de Buffers.
- * Isso evita problemas de conversão string→UTF-8→corrupção de bytes.
- */
-function buildMultipartParts(
-  text: string,
-  voiceUrl: string,
-  voiceWav?: File,
-): { parts: Buffer[]; boundary: string } {
-  const boundary = `v2-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-  const parts: Buffer[] = [];
-
-  // Part: text (sempre presente)
-  parts.push(
-    Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="text"\r\n\r\n${text}\r\n`,
-    ),
-  );
-
-  // Se há voice_wav, NÃO enviamos voice_url (o Pocket TTS precisa de apenas um)
-  if (voiceWav) {
-    // Part: voice_wav (header + conteúdo binário será adicionado no handler)
-    parts.push(
-      Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="voice_wav"; filename="${voiceWav.name}"\r\nContent-Type: ${voiceWav.type || 'audio/wav'}\r\n\r\n`,
-      ),
-    );
-    return { parts, boundary };
-  }
-
-  // Part: voice_url (somente quando NÃO há voice_wav)
-  if (voiceUrl) {
-    parts.push(
-      Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="voice_url"\r\n\r\n${voiceUrl}\r\n`,
-      ),
-    );
-  }
-
-  // Footer
-  parts.push(Buffer.from(`--${boundary}--\r\n`));
-
-  return { parts, boundary };
-}
 
 /**
  * POST /api/tts/generate-v2
@@ -80,35 +35,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const wavFile = voiceWav instanceof File ? (voiceWav as File) : undefined;
+    // --- Construir body multipart usando form-data (biblioteca Node.js) ---
+    // Isso garante que o formato multipart seja exatamente o esperado
+    // pelo servidor Pocket TTS (mesmo formato que curl usa).
+    const form = new FormData();
+    form.append('text', text.trim());
 
-    // --- Construir body multipart como array de Buffers ---
-    const { parts, boundary } = buildMultipartParts(
-      text.trim(),
-      voiceUrl || '',
-      wavFile,
-    );
-
-    const outgoingContentType = `multipart/form-data; boundary=${boundary}`;
+    if (voiceWav && voiceWav instanceof File) {
+      // Clonagem de voz: envia o arquivo binário
+      const wavFile = voiceWav as File;
+      const buffer = Buffer.from(await wavFile.arrayBuffer());
+      form.append('voice_wav', buffer, {
+        filename: wavFile.name,
+        contentType: wavFile.type || 'application/octet-stream',
+      });
+    } else if (voiceUrl) {
+      // Voz builtin/custom: envia o nome da voz
+      form.append('voice_url', voiceUrl);
+    }
 
     // --- Forward para Pocket TTS ---
     const ttsUrl = `${TTS_SERVER_URL}/tts`;
 
-    let fullBody: Buffer;
-
-    if (wavFile) {
-      // Com arquivo: parts + bytes binários do arquivo
-      const wavBytes = Buffer.from(await wavFile.arrayBuffer());
-      fullBody = Buffer.concat([...parts, wavBytes]);
-    } else {
-      // Sem arquivo: parts já inclui o footer
-      fullBody = Buffer.concat(parts);
-    }
-
     const response = await fetch(ttsUrl, {
       method: 'POST',
-      body: fullBody,
-      headers: { 'Content-Type': outgoingContentType },
+      body: form.getBuffer(),
+      headers: form.getHeaders(),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT),
     });
 
