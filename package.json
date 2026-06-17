@@ -7,8 +7,8 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run serve:tts\"",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "lint:fix": "next lint --fix",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "serve:tts": "pocket-tts serve --host 0.0.0.0 --port 8000 --language portuguese",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -18,7 +18,7 @@
     "e2e:headed": "playwright test --headed"
   },
   "dependencies": {
-    "next": "^15.2.4",
+    "next": "^16.2.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -35,8 +35,8 @@
     "@typescript-eslint/eslint-plugin": "^8.29.0",
     "@typescript-eslint/parser": "^8.61.1",
     "concurrently": "^10.0.3",
-    "eslint": "^9.39.4",
-    "eslint-config-next": "^15.2.4",
+    "eslint": "^10.5.0",
+    "eslint-config-next": "^16.2.9",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",
     "husky": "^9.1.7",
