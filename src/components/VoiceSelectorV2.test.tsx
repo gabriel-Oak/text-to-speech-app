@@ -347,7 +347,9 @@ describe('VoiceSelectorV2', () => {
         selectedVoice: 'giovanni',
       });
 
-      const select = screen.getByRole('combobox', { name: 'Voz:' });
+      const select = screen.getByRole('combobox', {
+        name: 'Voz:',
+      }) as HTMLSelectElement;
       expect(select.value).toBe('giovanni');
 
       rerender(

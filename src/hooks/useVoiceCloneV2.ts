@@ -223,7 +223,15 @@ export function useVoiceCloneV2(): {
         if (done) break;
         chunks.push(value);
       }
-      const audioBlob = new Blob(chunks, {
+      // Concatena todos os chunks em um único Uint8Array
+      const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const merged = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+      }
+      const audioBlob = new Blob([merged.buffer], {
         type: response.headers.get('content-type') || 'audio/wav',
       });
       const objectUrl = URL.createObjectURL(audioBlob);
