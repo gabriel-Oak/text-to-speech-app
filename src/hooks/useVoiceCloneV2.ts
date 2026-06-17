@@ -34,7 +34,7 @@ export interface VoiceCloneV2State {
  *  2. Dependência entre campos:
  *     - selectedVoice preenchido → upload desabilitado
  *     - uploadedAudio selecionado → voice selector desabilitado
- *  3. Ao gerar, chama POST /api/tts/generate-v2
+ *  3. Ao gerar, chama POST diretamente no Pocket TTS (/tts)
  *  4. Se sucesso → ready com audioUrl
  *  5. Se falha → error com mensagem
  *
@@ -144,7 +144,7 @@ export function useVoiceCloneV2(): {
   );
 
   // ---------------------------------------------------------------------------
-  // generateAudio: valida, chama API e processa resposta
+  // generateAudio: valida, chama API do Pocket TTS diretamente e processa resposta
   // ---------------------------------------------------------------------------
   const generateAudio = useCallback(async (): Promise<AudioState> => {
     // Validação: texto preenchido
@@ -195,9 +195,13 @@ export function useVoiceCloneV2(): {
         formData.append('voice_wav', uploadedAudio);
       }
 
-      const response = await fetch('/api/tts/generate-v2', {
+      // Chama o Pocket TTS diretamente (CORS já configurado)
+      const ttsServerUrl =
+        process.env.NEXT_PUBLIC_TTS_SERVER_URL || 'http://localhost:8000';
+      const response = await fetch(`${ttsServerUrl}/tts`, {
         method: 'POST',
         body: formData,
+        signal: AbortSignal.timeout(60000),
       });
 
       if (!response.ok) {
@@ -211,7 +215,17 @@ export function useVoiceCloneV2(): {
         throw new Error(errorMessage);
       }
 
-      const audioBlob = await response.blob();
+      // Consume a stream chunk-by-chunk (response.blob() falha com chunked streams)
+      const reader = response.body!.getReader();
+      const chunks: Uint8Array[] = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+      const audioBlob = new Blob(chunks, {
+        type: response.headers.get('content-type') || 'audio/wav',
+      });
       const objectUrl = URL.createObjectURL(audioBlob);
       registerObjectUrl(objectUrl);
 

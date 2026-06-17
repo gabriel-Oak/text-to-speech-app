@@ -18,12 +18,13 @@ export interface UseStreamAudioReturn {
   currentTime: number;
   duration: number;
   isPlaying: boolean;
-  loadAudio: (url: string) => void;
+  loadAudio: (url: string, autoPlay?: boolean) => void;
   play: () => void;
   pause: () => void;
   seek: (time: number) => void;
   reset: () => void;
   audioUrl: string | null;
+  audioElement: HTMLAudioElement | null;
 }
 
 /**
@@ -36,6 +37,10 @@ export interface UseStreamAudioReturn {
  *  - Criação e cleanup de object URLs
  *  - Event listeners para metadata, timeupdate, ended, pause
  *  - Controle de play/pause/seek/reset
+ *
+ * IMPORTANTE: O elemento audio é criado dentro de loadAudio (lazy).
+ * O componente consumidor (AudioPlayer) deve usar o audioElement exposto
+ * para renderizar o <audio> e sincronizar o UI state.
  */
 export function useStreamAudio(): UseStreamAudioReturn {
   const [status, setStatus] = useState<StreamAudioStatus>('idle');
@@ -49,6 +54,10 @@ export function useStreamAudio(): UseStreamAudioReturn {
 
   // Rastreia object URLs para cleanup
   const objectUrlsRef = useRef<Set<string>>(new Set());
+
+  // Controle de auto-play (mantido para compatibilidade, mas o play síncrono
+  // agora é feito diretamente em loadAudio dentro do user gesture context)
+  const autoPlayRef = useRef(false);
 
   // ---------------------------------------------------------------------------
   // Cleanup: revoga todas as object URLs e destrói o elemento audio
@@ -81,7 +90,13 @@ export function useStreamAudio(): UseStreamAudioReturn {
     const audio = audioRef.current;
     if (audio) {
       setDuration(audio.duration);
-      // Metadata carregado, pronto para reproduzir
+      // Auto-play já foi chamado sincronicamente em loadAudio.
+      // Se o navegador bloqueou, tenta novamente aqui (fora do user gesture,
+      // pode falhar, mas é a melhor chance restante).
+      if (autoPlayRef.current) {
+        autoPlayRef.current = false;
+        audio.play().catch(() => {});
+      }
       setStatus('idle');
     }
   }, []);
@@ -134,7 +149,7 @@ export function useStreamAudio(): UseStreamAudioReturn {
   // ---------------------------------------------------------------------------
 
   const loadAudio = useCallback(
-    (url: string) => {
+    (url: string, autoPlay = false) => {
       // Revoke URL anterior
       registerObjectUrl(url);
 
@@ -155,7 +170,21 @@ export function useStreamAudio(): UseStreamAudioReturn {
 
       // Define source e inicia carregamento
       audio.src = url;
-      audio.preload = 'metadata';
+      audio.preload = 'auto';
+
+      // Marca auto-play (fallback para loadedmetadata callback)
+      autoPlayRef.current = autoPlay;
+
+      // Auto-play síncrono: chama play() DENTRO do contexto do user gesture.
+      // Isso é essencial porque o navegador só permite autoplay quando o play()
+      // é chamado diretamente como resultado de uma interação do usuário (click).
+      // Se chamarmos play() em um callback assíncrono (setTimeout, Promise.then,
+      // event listener), o navegador bloqueia.
+      if (autoPlay) {
+        audio.play().catch(() => {
+          // Navegador bloqueou autoplay — o usuário precisa clicar no play
+        });
+      }
 
       // Muda status para buffering
       setStatus('buffering');
@@ -245,5 +274,6 @@ export function useStreamAudio(): UseStreamAudioReturn {
     seek,
     reset,
     audioUrl,
+    audioElement: audioRef.current,
   };
 }

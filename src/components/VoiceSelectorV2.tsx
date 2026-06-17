@@ -246,24 +246,26 @@ export default function VoiceSelectorV2({
             })}
             <option value={CUSTOM_URL_OPTION}>Custom URL...</option>
           </select>
-        </div>
-      )}
 
-      {/* Botão de limpar — visível quando há valor selecionado */}
-      {(hasValue || isCustomUrl) && !isCustomMode && (
-        <button
-          type="button"
-          style={{
-            ...styles.clearButton,
-            alignSelf: 'flex-start',
-            position: 'relative',
-          }}
-          onClick={handleClear}
-          aria-label="Limpar seleção de voz"
-          title="Limpar seleção de voz"
-        >
-          ✕
-        </button>
+          {/* Botão de limpar — posicionado ao lado do select */}
+          {(hasValue || isCustomUrl) && (
+            <button
+              type="button"
+              className="voice-selector-clear-btn"
+              style={{
+                ...styles.clearButton,
+                opacity: disabled ? 0.4 : 1,
+                cursor: disabled ? 'not-allowed' : 'pointer',
+              }}
+              onClick={handleClear}
+              aria-label="Limpar seleção de voz"
+              title="Limpar seleção de voz"
+              tabIndex={disabled ? -1 : 0}
+            >
+              ✕
+            </button>
+          )}
+        </div>
       )}
 
       {/* Help text para URL custom */}
@@ -378,6 +380,7 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'pointer',
     transition:
       'border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease',
+    paddingRight: 40,
   },
   customInputWrapper: {
     width: '100%',

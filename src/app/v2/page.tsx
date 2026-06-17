@@ -43,8 +43,7 @@ function V2Content() {
     try {
       const result = await voiceCloneState.generateAudio();
       if (result?.audioUrl) {
-        streamAudio.loadAudio(result.audioUrl);
-        streamAudio.play();
+        streamAudio.loadAudio(result.audioUrl, true);
       }
     } catch {
       // handled by useVoiceCloneV2 (error state + toast)
@@ -117,6 +116,13 @@ function V2Content() {
             src={streamAudio.audioUrl}
             filename="voice-clone-output.wav"
             showSuccessPulse={generationStatus === 'success'}
+            audioElement={streamAudio.audioElement}
+            isPlaying={streamAudio.isPlaying}
+            currentTime={streamAudio.currentTime}
+            duration={streamAudio.duration}
+            onPlayPause={
+              streamAudio.isPlaying ? streamAudio.pause : streamAudio.play
+            }
           />
         </div>
       )}
@@ -181,7 +187,7 @@ const v2Styles = `
 
   @media (min-width: 768px) {
     .v2-grid {
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1.6fr 1fr;
     }
   }
 
