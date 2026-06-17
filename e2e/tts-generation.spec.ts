@@ -17,72 +17,123 @@ async function isTtsServerRunning(): Promise<boolean> {
   }
 }
 
-test.describe('Pocket TTS — Fluxo completo de geração de áudio', () => {
+test.describe('Voice Clone — Fluxo completo', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(BASE_URL);
   });
 
-  test('deve carregar a página inicial com o cabeçalho', async ({ page }) => {
-    await expect(page.locator('h1')).toContainText('Pocket TTS');
-    await expect(
-      page.locator('text="Texto para falar"'),
-    ).toBeVisible();
+  test('deve carregar a página com o cabeçalho', async ({ page }) => {
+    await expect(page.locator('h1')).toContainText('Voice Clone');
   });
 
-  test('deve exibir seções do formulário', async ({ page }) => {
-    await expect(
-      page.locator('textarea, [role="textbox"]'),
-    ).toBeVisible();
-    await expect(page.locator('text=/Idioma/')).toBeVisible();
+  test('deve exibir o editor de texto', async ({ page }) => {
+    await expect(page.locator('textarea, [role="textbox"]')).toBeVisible();
+  });
+
+  test('deve exibir o seletor de voz', async ({ page }) => {
     await expect(page.locator('label', { hasText: 'Voz:' })).toBeVisible();
-    await expect(page.locator('button', { hasText: /Gerar/ })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Voz:' })).toBeVisible();
   });
 
-  test('deve preencher campos e verificar que API retorna áudio', async ({ page }) => {
+  test('deve exibir a área de upload de voz', async ({ page }) => {
+    // A área de upload é um dropzone com role=button e aria-label específico
+    await expect(
+      page.getByRole('button', {
+        name: 'Área de upload de áudio para clonagem de voz',
+      }),
+    ).toBeVisible();
+  });
+
+  test('deve exibir o botão de gerar áudio', async ({ page }) => {
+    await expect(
+      page.locator('button', { hasText: /Gerar Áudio/ }),
+    ).toBeVisible();
+  });
+
+  test('deve preencher texto e verificar que a API retorna áudio', async ({
+    page,
+  }) => {
     const textarea = page.locator('textarea, [role="textbox"]');
     await textarea.fill('Olá, este é um teste de texto para fala.');
-    await expect(textarea).toHaveValue('Olá, este é um teste de texto para fala.');
-
-    const generateBtn = page.locator('button', { hasText: /Gerar/ });
-    await generateBtn.click();
+    await expect(textarea).toHaveValue(
+      'Olá, este é um teste de texto para fala.',
+    );
 
     const ttsRunning = await isTtsServerRunning();
 
     if (ttsRunning) {
-      // Intercepta a resposta da API de geração de áudio
-      const audioResponse = await page.waitForResponse(
-        (response) => {
-          const url = response.url();
-          return url.includes('/api/tts/generate') && response.request().method() === 'POST';
-        },
-        { timeout: 60_000 },
-      );
+      // Faz a requisição diretamente do browser para o Pocket TTS
+      const audioResult = await page.evaluate(async (text) => {
+        const formData = new FormData();
+        formData.append('text', text);
+        formData.append('voice_url', 'rafael');
 
-      const status = audioResponse.status();
-      expect(status).toBe(200);
+        const res = await fetch('http://localhost:8000/tts', {
+          method: 'POST',
+          body: formData,
+          signal: AbortSignal.timeout(60_000),
+        });
+        let bodyBytes: number[] = [];
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok) {
+          const buffer = await res.arrayBuffer();
+          bodyBytes = Array.from(new Uint8Array(buffer));
+        }
+        return {
+          status: res.status,
+          contentType,
+          bodyLength: bodyBytes.length,
+        };
+      }, 'Olá, este é um teste de texto para fala.');
 
-      // Verifica que o conteúdo retornado é áudio (não JSON de erro)
-      const contentType = audioResponse.headers()['content-type'] || '';
-      expect(contentType).toMatch(/audio/i);
-
-      // Verifica que o corpo da resposta não está vazio
-      const body = await audioResponse.body();
-      expect(body.length).toBeGreaterThan(0);
+      expect(audioResult.status).toBe(200);
+      expect(audioResult.contentType).toMatch(/audio/i);
+      expect(audioResult.bodyLength).toBeGreaterThan(0);
     } else {
       // Se o servidor TTS não está rodando, o frontend deve mostrar erro
+      const generateBtn = page.locator('button', { hasText: /Gerar/ });
       await expect(generateBtn).toBeVisible();
     }
   });
 
-  test('deve mostrar dica de atalho Ctrl+Enter', async ({ page }) => {
-    const textarea = page.locator('textarea, [role="textbox"]');
-    await textarea.fill('Texto de teste');
-    await expect(
-      page.locator('text=/Ctrl\\+Enter/'),
-    ).toBeVisible({ timeout: 5_000 });
+  test('deve ter seletor com opções de voz builtin', async ({ page }) => {
+    // O VoiceSelector usa um <select> HTML nativo com id específico
+    const select = page.locator('#voice-selector-select');
+    await expect(select).toBeVisible();
+
+    // Verifica que o select tem mais de uma option (placeholder + vozes)
+    const optionCount = await select.locator('option').count();
+    expect(optionCount).toBeGreaterThan(1);
   });
 
-  test('deve ter seções de clonagem de voz', async ({ page }) => {
-    await expect(page.locator('text=/Clonar Voz|Upload|Voz Clonada/')).toBeVisible();
+  test('deve mostrar o player de áudio após geração bem-sucedida', async ({
+    page,
+  }) => {
+    // Preencher texto
+    const textarea = page.locator('textarea, [role="textbox"]');
+    await textarea.fill('Teste de geração.');
+
+    // Selecionar uma voz builtin
+    const select = page.locator('#voice-selector-select');
+    await select.selectOption('anna');
+
+    const ttsRunning = await isTtsServerRunning();
+
+    if (ttsRunning) {
+      // Clicar no botão gerar
+      const generateBtn = page.locator('button', { hasText: /Gerar Áudio/ });
+      await generateBtn.click();
+
+      // Aguardar o player aparecer (com timeout generoso para o TTS)
+      await expect(page.locator('[aria-label="Player de áudio"]')).toBeVisible({
+        timeout: 90_000,
+      });
+    }
+  });
+
+  test('deve desabilitar botão ao gerar sem texto', async ({ page }) => {
+    // Sem texto, o botão deve estar desabilitado
+    const generateBtn = page.locator('button', { hasText: /Gerar Áudio/ });
+    await expect(generateBtn).toBeDisabled();
   });
 });

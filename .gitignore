@@ -47,3 +47,8 @@ next-env.d.ts
 
 # TTS cloned voices
 .tts-voices/
+.samples
+test-results
+.plans
+.specs
+test-results/

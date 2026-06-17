@@ -21,8 +21,13 @@ const DOWNLOAD_LABEL = 'Baixar áudio';
 export interface AudioPlayerProps {
   src: string; // URL do áudio (object URL ou URL remota)
   filename?: string; // nome para download (default: 'audio.wav')
+  audioElement?: HTMLAudioElement | null; // elemento audio do useStreamAudio
   onEnded?: () => void;
   showSuccessPulse?: boolean; // animação de sucesso ao montar
+  isPlaying?: boolean; // estado de playback vindo do hook
+  onPlayPause?: () => void; // callback para play/pause
+  currentTime?: number; // tempo atual vindo do hook
+  duration?: number; // duração vindoo hook
 }
 
 // ---------------------------------------------------------------------------
@@ -43,16 +48,20 @@ function formatTime(seconds: number): string {
 export default function AudioPlayer({
   src,
   filename = DEFAULT_FILENAME,
+  audioElement,
   onEnded,
   showSuccessPulse = false,
+  isPlaying: externalIsPlaying,
+  onPlayPause,
+  currentTime: externalCurrentTime,
+  duration: externalDuration,
 }: AudioPlayerProps) {
-  const audioRef = useRef<HTMLAudioElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Estado
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  // Estado interno (fallback quando não há dados externos)
+  const [localIsPlaying, setLocalIsPlaying] = useState(false);
+  const [localCurrentTime, setLocalCurrentTime] = useState(0);
+  const [localDuration, setLocalDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [barHeights, setBarHeights] = useState<number[]>(() =>
     Array(BAR_COUNT).fill(MIN_BAR_HEIGHT),
@@ -64,73 +73,86 @@ export default function AudioPlayer({
 
   useEffect(() => {
     const urls = objectUrls.current;
-    // Registrar object URL para cleanup
     if (src.startsWith('blob:')) {
       urls.add(src);
     }
-
     return () => {
       urls.forEach((url) => URL.revokeObjectURL(url));
       urls.clear();
     };
   }, [src]);
 
+  // Valores externos ou internos
+  const playing =
+    externalIsPlaying !== undefined ? externalIsPlaying : localIsPlaying;
+  const currentTime =
+    externalCurrentTime !== undefined ? externalCurrentTime : localCurrentTime;
+  const duration =
+    externalDuration !== undefined ? externalDuration : localDuration;
+
   // Callbacks do elemento audio
+  const getAudio = () => audioElement || null;
+
   const handleLoadedMetadata = useCallback(() => {
-    const audio = audioRef.current;
-    if (audio) {
-      setDuration(audio.duration);
+    const audio = getAudio();
+    if (audio && externalDuration === undefined) {
+      setLocalDuration(audio.duration);
     }
-  }, []);
+  }, [externalDuration]);
 
   const handleTimeUpdate = useCallback(() => {
-    const audio = audioRef.current;
-    if (audio) {
-      setCurrentTime(audio.currentTime);
+    const audio = getAudio();
+    if (audio && externalCurrentTime === undefined) {
+      setLocalCurrentTime(audio.currentTime);
     }
-  }, []);
+  }, [externalCurrentTime]);
 
   const handleEnded = useCallback(() => {
-    setIsPlaying(false);
-    setCurrentTime(0);
-    if (onEnded) {
-      onEnded();
+    if (externalIsPlaying !== undefined) {
+      setLocalCurrentTime(0);
+    } else {
+      setLocalIsPlaying(false);
+      setLocalCurrentTime(0);
     }
-  }, [onEnded]);
+    if (onEnded) onEnded();
+  }, [onEnded, externalIsPlaying]);
 
   const handleError = useCallback(() => {
-    setIsPlaying(false);
-  }, []);
+    if (externalIsPlaying === undefined) {
+      setLocalIsPlaying(false);
+    }
+  }, [externalIsPlaying]);
 
   // Play / Pause
   const handlePlayPause = useCallback(() => {
-    const audio = audioRef.current;
+    if (onPlayPause) {
+      onPlayPause();
+      return;
+    }
+    const audio = getAudio();
     if (!audio) return;
-
-    if (isPlaying) {
+    if (playing) {
       audio.pause();
     } else {
       audio.play();
     }
-  }, [isPlaying]);
+  }, [onPlayPause, playing]);
 
   // Seek
   const handleSeekChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const time = parseFloat(e.target.value);
-      setCurrentTime(time);
-      const audio = audioRef.current;
-      if (audio) {
-        audio.currentTime = time;
-      }
+      setLocalCurrentTime(time);
+      const audio = getAudio();
+      if (audio) audio.currentTime = time;
     },
     [],
   );
 
-  // Seek via click na track (para div customizada)
+  // Seek via click na track
   const handleSeekTrackClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      const audio = audioRef.current;
+      const audio = getAudio();
       if (!audio || !duration || !containerRef.current) return;
 
       const rect = containerRef.current.getBoundingClientRect();
@@ -139,7 +161,7 @@ export default function AudioPlayer({
       const time = percentage * duration;
 
       audio.currentTime = time;
-      setCurrentTime(time);
+      setLocalCurrentTime(time);
     },
     [duration],
   );
@@ -149,77 +171,84 @@ export default function AudioPlayer({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const vol = parseFloat(e.target.value);
       setVolume(vol);
-      const audio = audioRef.current;
-      if (audio) {
-        audio.volume = vol;
-      }
+      const audio = getAudio();
+      if (audio) audio.volume = vol;
     },
     [],
   );
 
   // Download
   const handleDownload = useCallback(async () => {
-    const audio = audioRef.current;
-    if (!audio || !src || isDownloading) return;
-
+    if (!src || isDownloading) return;
     setIsDownloading(true);
-
     try {
-      const response = await fetch(src);
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      objectUrls.current.add(url);
-
+      if (src.startsWith('blob:')) {
+        const a = document.createElement('a');
+        a.href = src;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else {
+        const response = await fetch(src);
+        if (!response.ok) throw new Error('Fetch failed');
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        objectUrls.current.add(url);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+          objectUrls.current.delete(url);
+        }, 2000);
+      }
+    } catch {
       const a = document.createElement('a');
-      a.href = url;
+      a.href = src;
       a.download = filename;
+      a.target = '_blank';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-
-      // Cleanup após pequeno delay para garantir o download
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-        objectUrls.current.delete(url);
-      }, 1000);
-    } catch {
-      // Fallback: abrir em nova aba
-      window.open(src, '_blank');
     } finally {
       setIsDownloading(false);
     }
   }, [src, filename, isDownloading]);
 
-  // Simular waveform bars quando playing
+  // Waveform bars animation
   useEffect(() => {
-    if (!isPlaying) {
+    if (!playing) {
       setBarHeights(Array(BAR_COUNT).fill(MIN_BAR_HEIGHT));
       return;
     }
-
     const interval = setInterval(() => {
       setBarHeights((prev) =>
         prev.map(() => {
-          const random = Math.random();
-          // Distribuição: a maioria das barras fica entre 30%-100% do max
-          const intensity = 0.3 + random * 0.7;
+          const intensity = 0.3 + Math.random() * 0.7;
           return Math.round(
             MIN_BAR_HEIGHT + (MAX_BAR_HEIGHT - MIN_BAR_HEIGHT) * intensity,
           );
         }),
       );
     }, 120);
-
     return () => clearInterval(interval);
-  }, [isPlaying]);
+  }, [playing]);
 
-  // Sincronizar estado do audio com o state do React
+  // Attach event listeners to audio element
   useEffect(() => {
-    const audio = audioRef.current;
+    const audio = getAudio();
     if (!audio) return;
 
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
+    const onPlay = () => {
+      if (externalIsPlaying === undefined) setLocalIsPlaying(true);
+    };
+    const onPause = () => {
+      if (externalIsPlaying === undefined) setLocalIsPlaying(false);
+    };
 
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
@@ -236,14 +265,18 @@ export default function AudioPlayer({
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('error', handleError);
     };
-  }, [handleLoadedMetadata, handleTimeUpdate, handleEnded, handleError]);
+  }, [
+    handleLoadedMetadata,
+    handleTimeUpdate,
+    handleEnded,
+    handleError,
+    externalIsPlaying,
+  ]);
 
-  // Aplicar volume inicial
+  // Apply volume
   useEffect(() => {
-    const audio = audioRef.current;
-    if (audio) {
-      audio.volume = volume;
-    }
+    const audio = getAudio();
+    if (audio) audio.volume = volume;
   }, [volume]);
 
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -262,14 +295,6 @@ export default function AudioPlayer({
       role="region"
       aria-label="Player de áudio"
     >
-      {/* Elemento audio invisível */}
-      <audio
-        ref={audioRef}
-        src={src}
-        preload="metadata"
-        crossOrigin="anonymous"
-      />
-
       {/* Waveform Visual */}
       <div style={styles.waveform} aria-hidden="true">
         {barHeights.map((height, index) => (
@@ -279,8 +304,8 @@ export default function AudioPlayer({
               ...styles.bar,
               height: `${height}px`,
               animationDelay: `${index * 0.04}s`,
-              animationPlayState: isPlaying ? 'running' : 'paused',
-              opacity: isPlaying ? 1 : 0.3,
+              animationPlayState: playing ? 'running' : 'paused',
+              opacity: playing ? 1 : 0.3,
             }}
           />
         ))}
@@ -293,18 +318,17 @@ export default function AudioPlayer({
           id="tts-audio-play-btn"
           style={{
             ...styles.playButton,
-            background: isPlaying ? '#dc2626' : '#3b82f6',
+            background: playing ? '#dc2626' : '#3b82f6',
           }}
           onClick={handlePlayPause}
-          aria-label={isPlaying ? 'Pausar' : PLAY_PAUSE_LABEL}
+          aria-label={playing ? 'Pausar' : PLAY_PAUSE_LABEL}
           tabIndex={0}
         >
-          {isPlaying ? '⏸' : '▶️'}
+          {playing ? '⏸' : '▶️'}
         </button>
 
         {/* Seek Bar */}
         <div style={styles.seekSection}>
-          {/* Track clicável (fundo) */}
           <div
             id="tts-audio-seek-track"
             style={styles.seekTrack}
@@ -316,16 +340,13 @@ export default function AudioPlayer({
             aria-valuemax={Math.round(duration)}
             tabIndex={0}
           >
-            {/* Fundo vazio */}
             <div style={styles.seekTrackBg} />
-            {/* Barra preenchida */}
             <div
               style={{
                 ...styles.seekTrackFill,
                 width: `${progressPercentage}%`,
               }}
             />
-            {/* Thumb (bolinha) */}
             <div
               style={{
                 ...styles.seekThumb,
@@ -334,7 +355,6 @@ export default function AudioPlayer({
             />
           </div>
 
-          {/* Slider range invisível para acessibilidade */}
           <input
             type="range"
             min={0}
@@ -353,9 +373,8 @@ export default function AudioPlayer({
         </span>
       </div>
 
-      {/* Controles secundários: Volume + Download */}
+      {/* Controles secundários */}
       <div style={styles.secondaryControls}>
-        {/* Slider de Volume */}
         <div style={styles.volumeSection}>
           <span style={styles.volumeIcon}>🔊</span>
           <input
@@ -371,7 +390,6 @@ export default function AudioPlayer({
           />
         </div>
 
-        {/* Botão Download */}
         <button
           id="tts-audio-download-btn"
           style={{
@@ -531,7 +549,6 @@ const styles: Record<string, CSSProperties> = {
     fontFamily: 'inherit',
   },
 
-  // --- Waveform ---
   waveform: {
     display: 'flex',
     alignItems: 'center',
@@ -550,7 +567,6 @@ const styles: Record<string, CSSProperties> = {
     flexShrink: 0,
   },
 
-  // --- Controles principais ---
   controls: {
     display: 'flex',
     alignItems: 'center',
@@ -635,7 +651,6 @@ const styles: Record<string, CSSProperties> = {
     textAlign: 'right',
   },
 
-  // --- Controles secundários ---
   secondaryControls: {
     display: 'flex',
     alignItems: 'center',
