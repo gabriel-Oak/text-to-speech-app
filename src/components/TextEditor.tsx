@@ -15,7 +15,7 @@ const PLACEHOLDER =
 // Tipos do componente
 // ---------------------------------------------------------------------------
 
-export interface TextEditorV2Props {
+export interface TextEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -25,11 +25,11 @@ export interface TextEditorV2Props {
 // Componente
 // ---------------------------------------------------------------------------
 
-export default function TextEditorV2({
+export default function TextEditor({
   value,
   onChange,
   placeholder = PLACEHOLDER,
-}: TextEditorV2Props) {
+}: TextEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-focus na montagem
@@ -116,24 +116,24 @@ export default function TextEditorV2({
 
       {/* Estilos CSS injetados */}
       <style>{`
-        #text-editor-v2-textarea {
+        #text-editor-textarea {
           resize: vertical;
           min-height: 150px;
           max-height: 480px;
           transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
-        #text-editor-v2-textarea:hover:not(:disabled) {
+        #text-editor-textarea:hover:not(:disabled) {
           border-color: #475569;
         }
 
-        #text-editor-v2-textarea:focus {
+        #text-editor-textarea:focus {
           border-color: #3b82f6;
           box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
           outline: none;
         }
 
-        #text-editor-v2-textarea::placeholder {
+        #text-editor-textarea::placeholder {
           color: #64748b;
           font-style: italic;
         }

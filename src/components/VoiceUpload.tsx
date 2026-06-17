@@ -7,7 +7,7 @@ import type { CSSProperties } from 'react';
 // Props
 // ---------------------------------------------------------------------------
 
-export interface VoiceUploadV2Props {
+export interface VoiceUploadProps {
   file: File | null;
   onFileChange: (file: File | null) => void;
   disabled: boolean;
@@ -49,11 +49,11 @@ function getFileExtension(name: string): string {
 // Componente
 // ---------------------------------------------------------------------------
 
-export default function VoiceUploadV2({
+export default function VoiceUpload({
   file,
   onFileChange,
   disabled,
-}: VoiceUploadV2Props) {
+}: VoiceUploadProps) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');

@@ -1,17 +1,15 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import VoiceSelectorV2, {
-  VoiceSelectorV2Props,
-} from '@/components/VoiceSelectorV2';
+import VoiceSelector, { VoiceSelectorProps } from '@/components/VoiceSelector';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function renderComponent(props: Partial<VoiceSelectorV2Props> = {}) {
+function renderComponent(props: Partial<VoiceSelectorProps> = {}) {
   const onVoiceChangeMock = jest.fn();
 
   const { rerender } = render(
-    <VoiceSelectorV2
+    <VoiceSelector
       selectedVoice={null}
       onVoiceChange={onVoiceChangeMock}
       disabled={false}
@@ -29,7 +27,7 @@ function renderComponent(props: Partial<VoiceSelectorV2Props> = {}) {
 // Testes
 // ---------------------------------------------------------------------------
 
-describe('VoiceSelectorV2', () => {
+describe('VoiceSelector', () => {
   describe('renderização', () => {
     it('deve renderizar o label', () => {
       renderComponent();
@@ -292,7 +290,7 @@ describe('VoiceSelectorV2', () => {
       expect(onVoiceChangeMock).toHaveBeenCalledWith(null);
 
       rerender(
-        <VoiceSelectorV2
+        <VoiceSelector
           selectedVoice={null}
           onVoiceChange={onVoiceChangeMock}
           disabled={false}
@@ -347,11 +345,13 @@ describe('VoiceSelectorV2', () => {
         selectedVoice: 'giovanni',
       });
 
-      const select = screen.getByRole('combobox', { name: 'Voz:' });
+      const select = screen.getByRole('combobox', {
+        name: 'Voz:',
+      }) as HTMLSelectElement;
       expect(select.value).toBe('giovanni');
 
       rerender(
-        <VoiceSelectorV2
+        <VoiceSelector
           selectedVoice="rafael"
           onVoiceChange={onVoiceChangeMock}
           disabled={false}

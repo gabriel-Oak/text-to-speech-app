@@ -1,46 +1,46 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
-import './globals.css';
+import '../../app/globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Pocket TTS — Texto para Fala com IA',
+  title: 'Voice Clone — Gerador de Áudio',
   description:
-    'Conversão de texto em fala natural com clonagem de voz. Powered by Pocket TTS.',
-  keywords: [
-    'text-to-speech',
-    'tts',
-    'voice cloning',
-    'pocket tts',
-    'texto para fala',
-  ],
-  authors: [{ name: 'Pocket TTS' }],
-  openGraph: {
-    title: 'Pocket TTS — Texto para Fala com IA',
-    description: 'Conversão de texto em fala natural com clonagem de voz.',
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Pocket TTS — Texto para Fala com IA',
-    description: 'Conversão de texto em fala natural com clonagem de voz.',
-  },
+    'Gere áudio com vozes customizadas. Selecione uma voz ou faça upload de um áudio para clonagem e digite o texto a ser sintetizado.',
 };
 
 export const viewport: Viewport = {
-  width: 'default',
-  height: 'default',
+  width: 'device-width',
+  initialScale: 1,
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className="dark">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <div style={styles.wrapper}>
+          <div style={styles.inner}>{children}</div>
+        </div>
+      </body>
     </html>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Estilos do layout
+// ---------------------------------------------------------------------------
+
+const styles: Record<string, React.CSSProperties> = {
+  wrapper: {
+    minHeight: '100vh',
+    background: 'var(--color-bg)',
+    padding: '24px 16px',
+    display: 'flex',
+    justifyContent: 'center',
+  },
+  inner: {
+    width: '100%',
+    maxWidth: 1100,
+  },
+};

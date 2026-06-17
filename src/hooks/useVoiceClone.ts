@@ -12,7 +12,7 @@ export interface AudioState {
   audioUrl: string;
 }
 
-export interface VoiceCloneV2State {
+export interface VoiceCloneState {
   text: string;
   selectedVoice: string | null;
   uploadedAudio: File | null;
@@ -27,7 +27,7 @@ export interface VoiceCloneV2State {
 // ---------------------------------------------------------------------------
 
 /**
- * Hook que gerencia o ciclo de vida de geração de áudio via Voice Clone v2.
+ * Hook que gerencia o ciclo de vida de geração de áudio via Voice Clone.
  *
  * Fluxo:
  *  1. Usuário preenche texto e seleciona uma voz (builtin/custom) ou upload de áudio
@@ -40,8 +40,8 @@ export interface VoiceCloneV2State {
  *
  * Limpeza automática de object URLs para evitar memory leaks.
  */
-export function useVoiceCloneV2(): {
-  state: VoiceCloneV2State;
+export function useVoiceClone(): {
+  state: VoiceCloneState;
   generateAudio: () => Promise<AudioState>;
   reset: () => void;
   setText: (text: string) => void;
@@ -223,7 +223,15 @@ export function useVoiceCloneV2(): {
         if (done) break;
         chunks.push(value);
       }
-      const audioBlob = new Blob(chunks, {
+      // Concatena todos os chunks em um único Uint8Array
+      const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const merged = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+      }
+      const audioBlob = new Blob([merged.buffer], {
         type: response.headers.get('content-type') || 'audio/wav',
       });
       const objectUrl = URL.createObjectURL(audioBlob);
