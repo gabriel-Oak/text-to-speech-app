@@ -42,11 +42,11 @@ export default function MediaPreview({ src }: { src: string }) {
 
   // Cleanup element
   useEffect(() => {
+    const audio = audioRef.current;
     return () => {
-      const el = audioRef.current;
-      if (el) {
-        el.pause();
-        el.src = '';
+      if (audio) {
+        audio.pause();
+        audio.src = '';
       }
     };
   }, []);

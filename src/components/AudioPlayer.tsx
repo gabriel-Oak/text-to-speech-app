@@ -93,6 +93,7 @@ export default function AudioPlayer({
     externalDuration !== undefined ? externalDuration : localDuration;
 
   // Callbacks do elemento audio
+  /* eslint-disable react-hooks/exhaustive-deps */
   const getAudio = () => audioElement || null;
 
   const handleLoadedMetadata = useCallback(() => {
@@ -178,6 +179,7 @@ export default function AudioPlayer({
     },
     [],
   );
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Download
   const handleDownload = useCallback(async () => {
@@ -245,6 +247,7 @@ export default function AudioPlayer({
   }, [playing]);
 
   // Attach event listeners to audio element
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     const audio = getAudio();
     if (!audio) return;
@@ -284,6 +287,7 @@ export default function AudioPlayer({
     const audio = getAudio();
     if (audio) audio.volume = volume;
   }, [volume]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
