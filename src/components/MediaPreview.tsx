@@ -313,6 +313,7 @@ export default function MediaPreview({ src }: { src: string }) {
             align-items: center;
             gap: 14px;
             flex-wrap: wrap;
+            margin-bottom: 8px;
           }
 
           /* Botão play/pause — ícones brancos por padrão via color() hack */
