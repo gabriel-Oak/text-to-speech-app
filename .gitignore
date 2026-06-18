@@ -17,6 +17,12 @@
 .DS_Store
 *.pem
 
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
 # Local
 .env.local
 
