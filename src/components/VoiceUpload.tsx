@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { CSSProperties } from 'react';
+import MediaPreview from './MediaPreview';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -249,6 +250,7 @@ export default function VoiceUpload({
         <>
           {/* Área de drag-and-drop */}
           <div
+            className="voice-upload-drop-zone"
             style={{
               ...styles.dropZone,
               ...(dragActive ? styles.dropZoneActive : {}),
@@ -325,6 +327,7 @@ export default function VoiceUpload({
                   </span>
                 </div>
                 <button
+                  className="voice-upload-remove-btn"
                   type="button"
                   style={styles.removeButton}
                   onClick={(e) => {
@@ -338,14 +341,17 @@ export default function VoiceUpload({
                 </button>
               </div>
 
-              {/* Player de áudio */}
-              <audio
-                src={audioUrl}
-                controls
-                style={styles.audioPlayer}
-                preload="auto"
-                aria-label={`Preview do áudio: ${file.name}`}
-              />
+              {/* Preview customizado — waveform + controles */}
+              <div
+                style={{
+                  background: '#111827',
+                  borderRadius: 12,
+                  padding: '8px 12px',
+                  marginTop: 4,
+                }}
+              >
+                <MediaPreview src={audioUrl} />
+              </div>
 
               {/* Mensagem de erro */}
               {errorMessage && (
@@ -379,14 +385,6 @@ export default function VoiceUpload({
           background-color: rgba(239, 68, 68, 0.15) !important;
           color: #fca5a5 !important;
           transform: scale(1.15);
-        }
-
-        .voice-upload-audio::-webkit-media-controls-panel {
-          background-color: #1e293b;
-        }
-
-        .voice-upload-audio::-webkit-media-controls-play-button {
-          background-color: #3b82f6;
         }
       `}</style>
     </div>
@@ -490,6 +488,11 @@ const styles: Record<string, CSSProperties> = {
     gap: 10,
     transition: 'border-color 0.2s ease, background-color 0.2s ease',
   },
+  mediaPreviewWrapper: {
+    background: '#ffffff',
+    borderRadius: 10,
+    overflow: 'hidden', // clip waveform edges
+  },
   previewHeader: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -531,11 +534,6 @@ const styles: Record<string, CSSProperties> = {
     transition:
       'background-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
     padding: 0,
-  },
-  audioPlayer: {
-    width: '100%',
-    height: 36,
-    borderRadius: 6,
   },
   /* Error bar */
   errorBar: {

@@ -28,12 +28,65 @@ const STATUS_COLORS: Record<
   },
 };
 
-const STATUS_TEXT: Record<string, string> = {
-  idle: '🎵 Gerar Áudio',
-  loading: '⏳ Gerando...',
-  success: '✅ Gerado!',
-  error: '❌ Erro',
+const STATUS_LABELS: Record<string, string> = {
+  idle: 'Gerar Áudio',
+  loading: 'Gerando...',
+  success: 'Gerado!',
+  error: 'Erro',
 };
+
+// ---------------------------------------------------------------------------
+// Ícones de status (SVG com fill/stroke que respeitam currentColor do botão pai)
+// ---------------------------------------------------------------------------
+
+function StatusIcon({ isError }: { isError?: boolean }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      style={{ display: 'inline-flex', verticalAlign: 'middle' }}
+      aria-hidden="true"
+    >
+      <circle
+        cx={12}
+        cy={12}
+        r={10}
+        stroke="currentColor"
+        strokeWidth="2"
+        fill="none"
+      />
+      {isError ? (
+        <>
+          <line
+            x1="7"
+            y1="7"
+            x2="17"
+            y2="17"
+            stroke="currentColor"
+            strokeWidth="2"
+          />
+          <line
+            x1="17"
+            y1="7"
+            x2="7"
+            y2="17"
+            stroke="currentColor"
+            strokeWidth="2"
+          />
+        </>
+      ) : (
+        <polyline
+          points="6,12 10,16 18,8"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+      )}
+    </svg>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Tipos do componente
@@ -91,7 +144,7 @@ export default function GenerationButton({
   );
 
   const colors = STATUS_COLORS[status];
-  const text = STATUS_TEXT[status];
+  const label = STATUS_LABELS[status];
   const isLoading = status === 'loading';
   const isError = status === 'error';
   const isSuccess = status === 'success';
@@ -129,14 +182,15 @@ export default function GenerationButton({
         onMouseLeave={handleMouseLeave}
         onKeyDown={handleKeyDown}
         disabled={disabled || isLoading}
-        aria-label={text}
+        aria-label={label}
         aria-busy={isLoading ? 'true' : undefined}
         aria-describedby={isError ? 'generation-error-tooltip' : undefined}
         role="button"
         tabIndex={0}
       >
-        {/* Spinner de loading */}
+        {/* Spinner de loading ou ícone de status */}
         {isLoading && <span className="gb-spinner" aria-hidden="true" />}
+        {!isLoading && <StatusIcon isError={isError} />}
 
         {/* Texto do botão */}
         <span
@@ -147,7 +201,7 @@ export default function GenerationButton({
               : 'none',
           }}
         >
-          {text}
+          {label}
         </span>
       </button>
 

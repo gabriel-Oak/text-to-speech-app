@@ -319,12 +319,49 @@ export default function AudioPlayer({
           style={{
             ...styles.playButton,
             background: playing ? '#dc2626' : '#3b82f6',
+            color: '#ffffff',
           }}
           onClick={handlePlayPause}
           aria-label={playing ? 'Pausar' : PLAY_PAUSE_LABEL}
           tabIndex={0}
         >
-          {playing ? '⏸' : '▶️'}
+          <>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              style={{
+                display: 'inline-flex',
+                verticalAlign: 'middle',
+                fontSize: '16px',
+              }}
+              aria-hidden="true"
+            >
+              {!playing && (
+                <polygon points="8,5 19,13 8,19" fill="currentColor" />
+              )}
+              {playing && (
+                <>
+                  <rect
+                    x="6"
+                    y="4.5"
+                    width="4"
+                    height="15"
+                    rx="1"
+                    fill="currentColor"
+                  />
+                  <rect
+                    x="14"
+                    y="4.5"
+                    width="4"
+                    height="15"
+                    rx="1"
+                    fill="currentColor"
+                  />
+                </>
+              )}
+            </svg>
+          </>
         </button>
 
         {/* Seek Bar */}
