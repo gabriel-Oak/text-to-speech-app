@@ -10,6 +10,7 @@ export type GenerationStatus = 'idle' | 'generating' | 'ready' | 'error';
 
 export interface AudioState {
   audioUrl: string;
+  audioBlob?: Blob | null;
 }
 
 export interface VoiceCloneState {
@@ -19,6 +20,7 @@ export interface VoiceCloneState {
   isGenerating: boolean;
   error: string | null;
   audioUrl: string | null;
+  audioBlob: Blob | null;
   generationStatus: GenerationStatus;
 }
 
@@ -35,10 +37,11 @@ export interface VoiceCloneState {
  *     - selectedVoice preenchido → upload desabilitado
  *     - uploadedAudio selecionado → voice selector desabilitado
  *  3. Ao gerar, chama POST diretamente no Pocket TTS (/tts)
- *  4. Se sucesso → ready com audioUrl
+ *  4. Se sucesso → ready com audioUrl + audioBlob
  *  5. Se falha → error com mensagem
  *
- * Limpeza automática de object URLs para evitar memory leaks.
+ * O Blob é armazenado em memória para permitir recriar object URLs sob demanda,
+ * evitando que o download falhe quando o URL original é revogado.
  */
 export function useVoiceClone(): {
   state: VoiceCloneState;
@@ -56,6 +59,7 @@ export function useVoiceClone(): {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioBlob, setAudioBlobState] = useState<Blob | null>(null);
   const [generationStatus, setGenerationStatus] =
     useState<GenerationStatus>('idle');
 
@@ -180,6 +184,7 @@ export function useVoiceClone(): {
     // Limpa estado anterior
     setError(null);
     setAudioUrl(null);
+    setAudioBlobState(null);
     setIsGenerating(true);
     setGenerationStatus('generating');
 
@@ -236,11 +241,13 @@ export function useVoiceClone(): {
       });
       const objectUrl = URL.createObjectURL(audioBlob);
       registerObjectUrl(objectUrl);
+      // Armazena o Blob em estado para recriar URLs sob demanda no download
+      setAudioBlobState(audioBlob);
 
       setIsGenerating(false);
       setGenerationStatus('ready');
 
-      return { audioUrl: objectUrl };
+      return { audioUrl: objectUrl, audioBlob };
     } catch (err) {
       const message =
         err instanceof Error
@@ -267,6 +274,7 @@ export function useVoiceClone(): {
     setUploadedAudioState(null);
     setIsGenerating(false);
     setAudioUrl(null);
+    setAudioBlobState(null);
     setError(null);
     setGenerationStatus('idle');
   }, [audioUrl]);
@@ -282,6 +290,7 @@ export function useVoiceClone(): {
       isGenerating,
       error,
       audioUrl,
+      audioBlob,
       generationStatus,
     },
     generateAudio,
