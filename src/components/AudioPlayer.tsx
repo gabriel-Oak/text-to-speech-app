@@ -21,6 +21,7 @@ const DOWNLOAD_LABEL = 'Baixar áudio';
 export interface AudioPlayerProps {
   src: string; // URL do áudio (object URL ou URL remota)
   filename?: string; // nome para download (default: 'audio.wav')
+  audioBlob?: Blob | null; // blob cru para download (evita revogação prematura)
   audioElement?: HTMLAudioElement | null; // elemento audio do useStreamAudio
   onEnded?: () => void;
   showSuccessPulse?: boolean; // animação de sucesso ao montar
@@ -48,6 +49,7 @@ function formatTime(seconds: number): string {
 export default function AudioPlayer({
   src,
   filename = DEFAULT_FILENAME,
+  audioBlob,
   audioElement,
   onEnded,
   showSuccessPulse = false,
@@ -91,6 +93,7 @@ export default function AudioPlayer({
     externalDuration !== undefined ? externalDuration : localDuration;
 
   // Callbacks do elemento audio
+  /* eslint-disable react-hooks/exhaustive-deps */
   const getAudio = () => audioElement || null;
 
   const handleLoadedMetadata = useCallback(() => {
@@ -176,48 +179,53 @@ export default function AudioPlayer({
     },
     [],
   );
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Download
   const handleDownload = useCallback(async () => {
     if (!src || isDownloading) return;
     setIsDownloading(true);
+
     try {
-      if (src.startsWith('blob:')) {
-        const a = document.createElement('a');
-        a.href = src;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+      // Se temos o blob cru disponível, usamos ele diretamente para criar
+      // um novo object URL. Isso evita o fetch que pode falhar com blob URLs.
+      let blobToDownload: Blob;
+      if (audioBlob) {
+        blobToDownload = audioBlob;
       } else {
+        // Fallback: busca o blob via fetch
         const response = await fetch(src);
-        if (!response.ok) throw new Error('Fetch failed');
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        objectUrls.current.add(url);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => {
-          URL.revokeObjectURL(url);
-          objectUrls.current.delete(url);
-        }, 2000);
+        if (!response.ok) throw new Error('Failed to fetch audio blob');
+        blobToDownload = await response.blob();
       }
+
+      const downloadUrl = URL.createObjectURL(blobToDownload);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = filename;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Revoga o URL temporário após garantir que o download foi iniciado.
+      setTimeout(() => {
+        URL.revokeObjectURL(downloadUrl);
+      }, 3000);
     } catch {
+      // Fallback final: abre o src em nova aba
       const a = document.createElement('a');
       a.href = src;
       a.download = filename;
       a.target = '_blank';
+      a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
     } finally {
       setIsDownloading(false);
     }
-  }, [src, filename, isDownloading]);
+  }, [src, filename, audioBlob, isDownloading]);
 
   // Waveform bars animation
   useEffect(() => {
@@ -239,6 +247,7 @@ export default function AudioPlayer({
   }, [playing]);
 
   // Attach event listeners to audio element
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     const audio = getAudio();
     if (!audio) return;
@@ -278,6 +287,7 @@ export default function AudioPlayer({
     const audio = getAudio();
     if (audio) audio.volume = volume;
   }, [volume]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -319,12 +329,49 @@ export default function AudioPlayer({
           style={{
             ...styles.playButton,
             background: playing ? '#dc2626' : '#3b82f6',
+            color: '#ffffff',
           }}
           onClick={handlePlayPause}
           aria-label={playing ? 'Pausar' : PLAY_PAUSE_LABEL}
           tabIndex={0}
         >
-          {playing ? '⏸' : '▶️'}
+          <>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              style={{
+                display: 'inline-flex',
+                verticalAlign: 'middle',
+                fontSize: '16px',
+              }}
+              aria-hidden="true"
+            >
+              {!playing && (
+                <polygon points="8,5 19,13 8,19" fill="currentColor" />
+              )}
+              {playing && (
+                <>
+                  <rect
+                    x="6"
+                    y="4.5"
+                    width="4"
+                    height="15"
+                    rx="1"
+                    fill="currentColor"
+                  />
+                  <rect
+                    x="14"
+                    y="4.5"
+                    width="4"
+                    height="15"
+                    rx="1"
+                    fill="currentColor"
+                  />
+                </>
+              )}
+            </svg>
+          </>
         </button>
 
         {/* Seek Bar */}
@@ -545,7 +592,7 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 14,
     display: 'flex',
     flexDirection: 'column',
-    gap: 18,
+    gap: 8,
     fontFamily: 'inherit',
   },
 

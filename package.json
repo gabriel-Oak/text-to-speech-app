@@ -50,7 +50,7 @@
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
-      "sh -c 'npx next lint --fix' --",
+      "sh -c 'npx eslint --fix' --",
       "prettier --write"
     ],
     "*.{json,md}": [

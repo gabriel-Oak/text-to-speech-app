@@ -115,6 +115,7 @@ function Content() {
           <AudioPlayer
             src={streamAudio.audioUrl}
             filename="voice-clone-output.wav"
+            audioBlob={voiceCloneState.state.audioBlob}
             showSuccessPulse={generationStatus === 'success'}
             audioElement={streamAudio.audioElement}
             isPlaying={streamAudio.isPlaying}

@@ -131,18 +131,12 @@ export function useStreamAudio(): UseStreamAudioReturn {
   // Registrar object URL para cleanup
   // ---------------------------------------------------------------------------
 
-  const registerObjectUrl = useCallback(
-    (url: string) => {
-      // Revoke URL anterior se existir
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl);
-        objectUrlsRef.current.delete(audioUrl);
-      }
-      objectUrlsRef.current.add(url);
-      setAudioUrl(url);
-    },
-    [audioUrl],
-  );
+  const registerObjectUrl = useCallback((url: string) => {
+    // NÃO revoga URLs aqui — o usoVoiceClone gerencia o ciclo de vida do blob.
+    // Apenas rastreia e atualiza o estado.
+    objectUrlsRef.current.add(url);
+    setAudioUrl(url);
+  }, []);
 
   // ---------------------------------------------------------------------------
   // loadAudio: carrega um URL no elemento audio
