@@ -582,7 +582,7 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 14,
     display: 'flex',
     flexDirection: 'column',
-    gap: 14,
+    gap: 8,
     fontFamily: 'inherit',
   },
 
