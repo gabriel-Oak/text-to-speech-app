@@ -1,0 +1,76 @@
+# ---------------------------------------------------------------------------
+# Text-to-Speech App — Docker Compose
+#
+# Serviços:
+#   app      — Next.js UI (frontend, build local)
+#   tts      — Pocket TTS server (Python, build local)
+#
+# Uso:
+#   docker compose up -d          # Inicia tudo (build automático)
+#   docker compose down           # Para e remove containers
+# ---------------------------------------------------------------------------
+
+services:
+  # -----------------------------------------------------------------------
+  # Next.js UI — Frontend da aplicação
+  # -----------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_TTS_SERVER_URL: http://tts:8000
+    container_name: tts-app
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_TTS_SERVER_URL=http://tts:8000
+      - NEXT_PUBLIC_DEFAULT_VOICE=rafael
+      - NEXT_PUBLIC_DEFAULT_LANGUAGE=portuguese
+      - NODE_ENV=production
+    depends_on:
+      tts:
+        condition: service_healthy
+    networks:
+      - tts-net
+    restart: unless-stopped
+
+  # -----------------------------------------------------------------------
+  # Pocket TTS — Servidor de síntese de voz (Python)
+  #
+  # Build local a partir do package pip pocket-tts.
+  #
+  # Volumes garantem persistência dos modelos (~500MB) entre reinicializações.
+  # A primeira vez vai baixar os modelos; depois usa o cache local.
+  # -----------------------------------------------------------------------
+  tts:
+    build:
+      context: ./tts-server
+      dockerfile: Dockerfile
+    container_name: pocket-tts
+    ports:
+      - "8000:8000"
+    volumes:
+      # Cache de pesos do modelo (Hugging Face) — evita re-download
+      - hf-cache:/root/.cache/huggingface
+      # Cache de vozes exportadas (safetensors)
+      - tts-cache:/root/.cache/pocket_tts
+    networks:
+      - tts-net
+    restart: unless-stopped
+
+# -----------------------------------------------------------------------
+# Volumes — Persistência dos modelos entre reinicializações
+# -----------------------------------------------------------------------
+volumes:
+  hf-cache:
+    driver: local
+  tts-cache:
+    driver: local
+
+# -----------------------------------------------------------------------
+# Network — Comunicação entre containers
+# -----------------------------------------------------------------------
+networks:
+  tts-net:
+    driver: bridge
