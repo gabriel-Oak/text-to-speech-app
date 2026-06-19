@@ -51,6 +51,18 @@ export default function MediaPreview({ src }: { src: string }) {
     };
   }, []);
 
+  // Handler de erro inline — captura erros antes que virem unhandledRejection
+  const handleAudioError = useCallback(() => {
+    const audio = audioRef.current;
+    if (audio?.error) {
+      console.error(
+        'Erro ao carregar áudio:',
+        audio.error.code,
+        audio.error.message,
+      );
+    }
+  }, []);
+
   // Metadata & time listeners
   useEffect(() => {
     const audio = audioRef.current;
@@ -109,7 +121,9 @@ export default function MediaPreview({ src }: { src: string }) {
     if (playing) {
       audio.pause();
     } else {
-      audio.play();
+      audio.play().catch((err) => {
+        console.error('Erro ao reproduzir áudio:', err);
+      });
     }
   }, [playing]);
 
@@ -151,6 +165,7 @@ export default function MediaPreview({ src }: { src: string }) {
         src={src}
         preload="auto"
         style={{ display: 'none' }}
+        onError={handleAudioError}
       />
 
       <div ref={containerRef} role="region" aria-label="Preview do áudio">
