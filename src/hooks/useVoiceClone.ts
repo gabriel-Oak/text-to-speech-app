@@ -206,7 +206,6 @@ export function useVoiceClone(): {
       const response = await fetch(`${ttsServerUrl}/tts`, {
         method: 'POST',
         body: formData,
-        signal: AbortSignal.timeout(60000),
       });
 
       if (!response.ok) {
