@@ -1,0 +1,70 @@
+# Git
+.git
+.gitignore
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# Dependencies
+node_modules
+
+# Next.js build output
+.next
+out
+
+# Testing
+coverage
+.test-results
+test-results
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__
+*.pyc
+.venv
+venv
+
+# Local env files
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Platform
+platforms
+
+# Plans and specs
+.plans
+.specs
+
+# Agents
+.agents
+
+# SWC
+.swc
+
+# TypeScript build info
+*.tsbuildinfo
+next-env.d.ts
+
+# Pocket TTS voices
+.tts-voices
+.samples
+
+# GitHub
+.github
+*.md

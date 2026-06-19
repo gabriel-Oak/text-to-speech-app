@@ -1,0 +1,84 @@
+# ---------------------------------------------------------------------------
+# Text-to-Speech App — Docker Compose
+#
+# Serviços:
+#   app      — Next.js UI (frontend, build local)
+#   tts      — Pocket TTS server (Python, image pré-construída do GHCR)
+#
+# Uso:
+#   docker compose up -d          # Inicia tudo (build automático do app)
+#   docker compose down           # Para e remove containers
+# ---------------------------------------------------------------------------
+
+services:
+  # -----------------------------------------------------------------------
+  # Next.js UI — Frontend da aplicação
+  # Build local necessário (Next.js precisa ser compilado)
+  # -----------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_TTS_SERVER_URL: http://tts:8000
+    container_name: tts-app
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_TTS_SERVER_URL=http://tts:8000
+      - NEXT_PUBLIC_DEFAULT_VOICE=rafael
+      - NEXT_PUBLIC_DEFAULT_LANGUAGE=portuguese
+      - NODE_ENV=production
+    depends_on:
+      tts:
+        condition: service_healthy
+    networks:
+      - tts-net
+    restart: unless-stopped
+
+  # -----------------------------------------------------------------------
+  # Pocket TTS — Servidor de síntese de voz (Python)
+  #
+  # Usa a imagem oficial do GHCR (kyutai-labs/pocket-tts).
+  # Sem build local — dá pull e sobe direto.
+  #
+  # Volumes garantem persistência dos modelos (~500MB) entre reinicializações.
+  # A primeira vez vai baixar os modelos; depois usa o cache local.
+  # -----------------------------------------------------------------------
+  tts:
+    image: ghcr.io/kyutai-labs/pocket-tts:latest
+    container_name: pocket-tts
+    ports:
+      - "8000:8000"
+    volumes:
+      # Cache de pesos do modelo (Hugging Face) — evita re-download
+      - hf-cache:/root/.cache/huggingface
+      # Cache de voces exportadas (safetensors)
+      - tts-cache:/root/.cache/pocket_tts
+    command:
+      ["serve", "--host", "0.0.0.0", "--port", "8000", "--language", "portuguese"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 120s
+    networks:
+      - tts-net
+    restart: unless-stopped
+
+# -----------------------------------------------------------------------
+# Volumes — Persistência dos modelos entre reinicializações
+# -----------------------------------------------------------------------
+volumes:
+  hf-cache:
+    driver: local
+  tts-cache:
+    driver: local
+
+# -----------------------------------------------------------------------
+# Network — Comunicação entre containers
+# -----------------------------------------------------------------------
+networks:
+  tts-net:
+    driver: bridge
